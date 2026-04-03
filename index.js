@@ -65,21 +65,27 @@ app.get('/', (req, res) => {
     });
 });
 
-// --- SINCRONIZACIÓN Y ARRANQUE ---
 sequelize.sync({ force: false }) 
     .then(() => {
         console.log('🗄️  Base de datos Retail sincronizada');
-        // '0.0.0.0' permite que servicios como Render detecten el puerto correctamente
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`
-            ==========================================
-            ✅ Servidor RETAIL corriendo en puerto ${PORT}
-            🔗 Local: http://localhost:${PORT}
-            🌐 Público: ${process.env.URL_BACKEND || 'No definida'}
-            ==========================================
-            `);
-        });
+        levantarServidor();
     })
     .catch(err => {
-        console.error('❌ Error al sincronizar la base de datos:', err);
+        // Si el error es por claves duplicadas, ignoramos y arrancamos igual
+        if (err.name === 'SequelizeDatabaseError' && err.parent.code === 'ER_FK_DUP_NAME') {
+            console.log('⚠️  Tablas ya existentes con relaciones. Iniciando servidor igual...');
+            levantarServidor();
+        } else {
+            console.error('❌ Error crítico al sincronizar:', err);
+        }
     });
+
+function levantarServidor() {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`
+        ==========================================
+        ✅ Servidor RETAIL ONLINE en puerto ${PORT}
+        ==========================================
+        `);
+    });
+}
