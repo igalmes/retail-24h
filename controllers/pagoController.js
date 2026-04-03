@@ -3,35 +3,39 @@ const client = require('../config/mpConfig');
 const Pedido = require('../models/Pedido');
 
 exports.crearPreferencia = async (req, res) => {
+    console.log("--- [RETAIL 24H] INICIO DE PROCESO DE PAGO ---");
+
     try {
         const { items } = req.body;
 
         if (!items || items.length === 0) {
+            console.error("❌ ERROR: El carrito llegó vacío al backend.");
             return res.status(400).json({ error: "El carrito está vacío" });
         }
 
-        // 1. Normalización y limpieza de items (Mercado Pago es estricto con los tipos)
+        // 1. Limpieza de datos (Mercado Pago falla si unit_price no es Number)
         const itemsProcesados = items.map(item => ({
             id: item.id?.toString() || 'prod-gen',
             title: item.nombre || item.title || 'Producto Retail 24h', 
-            unit_price: Number(item.unit_price || item.precio), // Forzamos Number
-            quantity: Number(item.quantity || 1),               // Forzamos Number
+            unit_price: Number(item.unit_price || item.precio), 
+            quantity: Number(item.quantity || 1),
             currency_id: 'ARS'
         }));
 
-        // 2. Calculamos el total para nuestra base de datos
+        // 2. Registro en DB local
         const totalPedido = itemsProcesados.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
-
-        // 3. Creamos el registro en nuestra DB como 'pendiente'
         const nuevoPedido = await Pedido.create({ 
             total: totalPedido,
             estado: 'pendiente' 
         });
 
-        console.log(`--- [MP] GENERANDO PREFERENCIA PARA PEDIDO #${nuevoPedido.id} ---`);
-
-        // 4. Inicializamos la Preferencia con el cliente de MP
+        // 3. Configuración de la Preferencia
         const preference = new Preference(client);
+
+        // Validamos URL_BACKEND para evitar el error de localhost en Webhooks
+        const urlWebhook = (process.env.URL_BACKEND && !process.env.URL_BACKEND.includes('localhost')) 
+            ? `${process.env.URL_BACKEND}/api/pagos/webhook` 
+            : null;
 
         const body = {
             items: itemsProcesados,
@@ -42,19 +46,15 @@ exports.crearPreferencia = async (req, res) => {
             },
             auto_return: "approved",
             external_reference: nuevoPedido.id.toString(),
-            // NOTA: Mercado Pago NO acepta localhost en notification_url. 
-            // Solo se activará si URL_BACKEND es una URL pública (Render/ngrok).
-            notification_url: process.env.URL_BACKEND?.includes('localhost') 
-                ? "" 
-                : `${process.env.URL_BACKEND}/api/pagos/webhook`,
+            notification_url: urlWebhook,
         };
 
         const result = await preference.create({ body });
 
-        // 5. Guardamos el ID de la preferencia en nuestra DB
+        // 4. Actualización de Pedido
         await nuevoPedido.update({ mp_preference_id: result.id });
 
-        console.log("✅ PREFERENCIA CREADA:", result.id);
+        console.log("✅ PREFERENCIA CREADA EXITOSAMENTE:", result.id);
 
         res.json({ 
             id: result.id, 
@@ -62,18 +62,23 @@ exports.crearPreferencia = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ ERROR AL CREAR PREFERENCIA:");
+        console.error("❌ ERROR CRÍTICO AL CREAR PREFERENCIA:");
         
-        // Si el error viene de Mercado Pago, intentamos parsear la respuesta
-        if (error.response) {
-            console.error("DETALLE MP:", JSON.stringify(error.response, null, 2));
+        // Esta es la parte clave: intentamos extraer la respuesta real de la API de MP
+        if (error.apiResponse) {
+            const bodyError = await error.apiResponse.json();
+            console.error("DETALLE TÉCNICO DE MP:", JSON.stringify(bodyError, null, 2));
+        } else if (error.message) {
+            console.error("MENSAJE DE ERROR:", error.message);
+            console.error("STACK:", error.stack);
         } else {
-            console.error("MENSAJE:", error.message);
+            // Si todo falla, imprimimos el objeto forzado a string
+            console.error("OBJETO DE ERROR COMPLETO:", JSON.stringify(error, null, 2));
         }
 
         res.status(500).json({ 
             error: "Error al generar el pago",
-            detalle: error.message 
+            detalle: error.message || "Error desconocido en Mercado Pago"
         });
     }
 };
