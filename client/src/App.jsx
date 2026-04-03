@@ -4,7 +4,7 @@ import './App.css'
 
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:4000/api' 
-    : 'https://tu-backend-en-render.onrender.com/api'; // <---
+    : 'https://retail-24h.onrender.com/api';
 
 function App() {
   const [lista, setLista] = useState([]);
