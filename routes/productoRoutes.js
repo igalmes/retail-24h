@@ -5,26 +5,31 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// 1. Configuración de Cloudinary (Usa las variables de entorno de Render)
+// FORZAR CARGA DE VARIABLES (Esto soluciona el 'Must supply api_key')
+require('dotenv').config();
+
+// CONFIGURACIÓN ROBUSTA: Intenta todos los nombres posibles que podrías tener en Render
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: process.env.CLOUDINARY_NAME || process.env.CLOUD_NAME || 'dthve8h8s',
+  api_key: process.env.CLOUDINARY_API_KEY || process.env.API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET || process.env.API_SECRET
 });
 
-// 2. Configuración de Almacenamiento en la Nube
+// Verificación interna en Logs (solo verás esto en Render)
+if (!process.env.CLOUDINARY_API_KEY && !process.env.API_KEY) {
+  console.error("⚠️ [CRÍTICO]: No se detectó ninguna API_KEY en las variables de entorno.");
+}
+
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'retail-24h-uploads', // Nombre de la carpeta en tu panel de Cloudinary
+    folder: 'retail-24h-uploads',
     allowed_formats: ['jpg', 'png', 'jpeg'],
-    transformation: [{ width: 1000, crop: 'limit' }] // Opcional: optimiza el tamaño
   },
 });
 
 const upload = multer({ storage });
 
-// 3. Rutas (se mantienen igual, pero 'upload' ahora es Cloudinary)
 router.post('/detectar', upload.single('imagen'), productoController.detectarYGuardar);
 router.get('/', productoController.obtenerTodos);
 router.put('/:id', productoController.actualizar);

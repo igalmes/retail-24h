@@ -4,6 +4,21 @@ const path = require('path');
 const cors = require('cors');
 const sequelize = require('./config/db'); 
 
+// --- DEBUG DE VARIABLES (PARA RENDER) ---
+console.log("--- [DEBUG] ESTADO DE VARIABLES DE ENTORNO ---");
+console.log("PORT:", process.env.PORT || "4000 (default)");
+console.log("MP_ACCESS_TOKEN:", process.env.MP_ACCESS_TOKEN ? "✅ CARGADO" : "❌ VACÍO");
+console.log("CLOUDINARY_NAME:", (process.env.CLOUDINARY_NAME || process.env.CLOUD_NAME) ? "✅ CARGADO" : "❌ VACÍO");
+console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "✅ CARGADO" : "❌ VACÍO");
+console.log("----------------------------------------------");
+
+// Capturador de errores globales para ver el detalle de "Must supply api_key"
+process.on('uncaughtException', (err) => {
+    console.error("❌ ERROR CRÍTICO NO CAPTURADO:");
+    console.error("Mensaje:", err.message);
+    console.error("Stack:", err.stack);
+});
+
 // Importación de Modelos
 const Producto = require('./models/Producto');
 const Pedido = require('./models/Pedido');
@@ -27,17 +42,15 @@ const whiteList = [
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:5175',
-    process.env.URL_FRONTEND, // https://retail-24h.onrender.com
+    process.env.URL_FRONTEND, 
     process.env.URL_BACKEND
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Permitimos peticiones sin origen (como procesos internos) o en la whitelist
         if (!origin || whiteList.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            // Falla silenciosa para no ensuciar logs de Render
             callback(null, false);
         }
     },
@@ -47,7 +60,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Middleware de utilidad (evita advertencias de túneles como ngrok si los usaras)
 app.use((req, res, next) => {
     res.setHeader('ngrok-skip-browser-warning', 'true');
     next();
@@ -67,7 +79,6 @@ app.get('/api/status', (req, res) => {
 });
 
 // 2. CAPTURA DE RUTAS DEL FRONTEND (SPA Routing)
-// Importante: Esto permite que React Router maneje las rutas en el cliente
 app.get('*', (req, res) => {
     const indexPath = path.join(__dirname, 'client', 'dist', 'index.html');
     res.sendFile(indexPath, (err) => {
@@ -84,13 +95,11 @@ sequelize.sync({ force: false })
         levantarServidor();
     })
     .catch(err => {
-        // Manejo específico para errores de FK duplicadas en MySQL
         if (err.parent && err.parent.code === 'ER_FK_DUP_NAME') {
             console.log('[SYSTEM]: Database tables verified.');
             levantarServidor();
         } else {
             console.error('[CRITICAL ERROR]: DB connection failed.');
-            // No exponemos el objeto 'err' completo para proteger credenciales
         }
     });
 
