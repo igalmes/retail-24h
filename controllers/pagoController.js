@@ -13,7 +13,7 @@ exports.crearPreferencia = async (req, res) => {
             return res.status(400).json({ error: "El carrito está vacío" });
         }
 
-        // 1. Limpieza de datos (Mercado Pago falla si unit_price no es Number)
+        // 1. Sanitización estricta (MP v2 rebota si unit_price es String)
         const itemsProcesados = items.map(item => ({
             id: item.id?.toString() || 'prod-gen',
             title: item.nombre || item.title || 'Producto Retail 24h', 
@@ -22,7 +22,7 @@ exports.crearPreferencia = async (req, res) => {
             currency_id: 'ARS'
         }));
 
-        // 2. Registro en DB local
+        // 2. Registro en DB local (Estado inicial)
         const totalPedido = itemsProcesados.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
         const nuevoPedido = await Pedido.create({ 
             total: totalPedido,
@@ -32,7 +32,7 @@ exports.crearPreferencia = async (req, res) => {
         // 3. Configuración de la Preferencia
         const preference = new Preference(client);
 
-        // Validamos URL_BACKEND para evitar el error de localhost en Webhooks
+        // Validación de Webhook: MP NO acepta localhost
         const urlWebhook = (process.env.URL_BACKEND && !process.env.URL_BACKEND.includes('localhost')) 
             ? `${process.env.URL_BACKEND}/api/pagos/webhook` 
             : null;
@@ -51,7 +51,7 @@ exports.crearPreferencia = async (req, res) => {
 
         const result = await preference.create({ body });
 
-        // 4. Actualización de Pedido
+        // 4. Guardamos el ID de MP en nuestra base de datos
         await nuevoPedido.update({ mp_preference_id: result.id });
 
         console.log("✅ PREFERENCIA CREADA EXITOSAMENTE:", result.id);
@@ -64,21 +64,25 @@ exports.crearPreferencia = async (req, res) => {
     } catch (error) {
         console.error("❌ ERROR CRÍTICO AL CREAR PREFERENCIA:");
         
-        // Esta es la parte clave: intentamos extraer la respuesta real de la API de MP
+        // --- BLOQUE DE DEBUG PROFUNDO ---
         if (error.apiResponse) {
-            const bodyError = await error.apiResponse.json();
-            console.error("DETALLE TÉCNICO DE MP:", JSON.stringify(bodyError, null, 2));
+            // Este bloque extrae el error real de la API de Mercado Pago
+            try {
+                const errorData = await error.apiResponse.json();
+                console.error("DETALLE TÉCNICO DE MP:", JSON.stringify(errorData, null, 2));
+            } catch (e) {
+                console.error("No se pudo parsear el JSON del error de MP.");
+            }
         } else if (error.message) {
-            console.error("MENSAJE DE ERROR:", error.message);
-            console.error("STACK:", error.stack);
+            console.error("MENSAJE:", error.message);
         } else {
-            // Si todo falla, imprimimos el objeto forzado a string
+            // Si todo falla, forzamos la visualización del objeto
             console.error("OBJETO DE ERROR COMPLETO:", JSON.stringify(error, null, 2));
         }
 
         res.status(500).json({ 
             error: "Error al generar el pago",
-            detalle: error.message || "Error desconocido en Mercado Pago"
+            detalle: error.message || "Error desconocido en la API de Mercado Pago"
         });
     }
 };
