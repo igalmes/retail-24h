@@ -30,12 +30,23 @@ Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId' });
 Usuario.hasMany(Pedido, { foreignKey: 'UsuarioId' });
 Pedido.belongsTo(Usuario, { foreignKey: 'UsuarioId' });
 
-// Relaciones de Pedidos y Productos
-Pedido.hasMany(PedidoItem, { foreignKey: 'PedidoId' });
-PedidoItem.belongsTo(Pedido, { foreignKey: 'PedidoId' });
+// Relaciones de Pedidos y Productos (CON NOMBRES EXPLÍCITOS PARA EVITAR DUPLICADOS)
+// Usamos nombres únicos para las FKs para que MySQL no use los nombres genéricos antiguos
+Pedido.hasMany(PedidoItem, { 
+    foreignKey: { name: 'PedidoId', allowNull: false },
+    onDelete: 'CASCADE' 
+});
+PedidoItem.belongsTo(Pedido, { 
+    foreignKey: { name: 'PedidoId', allowNull: false } 
+});
 
-Producto.hasMany(PedidoItem, { foreignKey: 'ProductoId' });
-PedidoItem.belongsTo(Producto, { foreignKey: 'ProductoId' });
+Producto.hasMany(PedidoItem, { 
+    foreignKey: { name: 'ProductoId', allowNull: false },
+    onDelete: 'CASCADE'
+});
+PedidoItem.belongsTo(Producto, { 
+    foreignKey: { name: 'ProductoId', allowNull: false } 
+});
 
 // --- AUTO-REGISTRO ADMIN ---
 const inicializarAdmin = async () => {
@@ -96,7 +107,7 @@ const startServer = async () => {
         // 1. ELIMINACIÓN TOTAL (Bypass de FK y limpieza de nombres)
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
         
-        // Borramos todas las variantes posibles de nombres
+        // Borramos todas las tablas involucradas
         await sequelize.query('DROP TABLE IF EXISTS PedidoItems');
         await sequelize.query('DROP TABLE IF EXISTS Pedidos');
         await sequelize.query('DROP TABLE IF EXISTS productos'); 
@@ -106,9 +117,10 @@ const startServer = async () => {
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
         console.log('📡 [LIMPIEZA]: Base de datos purgada.');
 
-        // 2. SINCRONIZAR (Usamos alter: false dentro de force para evitar duplicados)
+        // 2. SINCRONIZAR 
+        // Force: true creará las tablas y las FKs con los nombres explícitos definidos arriba
         await sequelize.sync({ force: true });
-        console.log('📡 [SYSTEM]: Estructura recreada sin conflictos de FK.');
+        console.log('📡 [SYSTEM]: Estructura recreada exitosamente.');
 
         // 3. INICIALIZAR ADMIN Y ARRANCAR
         await inicializarAdmin();
@@ -119,13 +131,9 @@ const startServer = async () => {
 
     } catch (err) {
         console.error('❌ [CRITICAL ERROR]:', err.message);
-        // Si el error es por nombre duplicado, forzamos un segundo intento tras pausa
-        if (err.message.includes('Duplicate foreign key')) {
-            console.log('🔄 Reintentando sincronización en 3 segundos...');
-            setTimeout(startServer, 3000);
-        } else {
-            process.exit(1);
-        }
+        // Salimos para evitar loops en Render; el log nos dirá si persiste el duplicado
+        process.exit(1); 
     }
 };
+
 startServer();
