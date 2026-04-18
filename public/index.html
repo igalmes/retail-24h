@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Retail 24h AI - Gestión de Inventario</title>
+    <style>
+        /* Fuente 1: Texto general */
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background: #1a1a2e; color: #fff; padding: 20px; 
+        }
+        /* Fuente 2: Números y EAN */
+        .numero, .ean { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-weight: bold; 
+        }
+        .controls { 
+            background: #16213e; padding: 20px; border-radius: 10px; 
+            margin-bottom: 20px; display: flex; gap: 10px; align-items: center;
+        }
+        input[type="text"] { flex-grow: 1; padding: 10px; border-radius: 5px; border: none; background: #0f3460; color: white; }
+        button { 
+            padding: 10px 20px; cursor: pointer; border-radius: 5px; border: none; 
+            font-weight: bold; background: #e94560; color: white; 
+        }
+        .btn-ia { background: #4ecca3; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+        .card { 
+            background: #16213e; padding: 15px; border-radius: 10px; 
+            text-align: center; border: 1px solid #0f3460; 
+        }
+        .card img { width: 100%; height: 160px; object-fit: cover; border-radius: 8px; background: white; }
+        .badge { background: #e94560; padding: 5px 10px; border-radius: 15px; display: inline-block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 Panel de Control Aiven AI</h1>
+
+    <div class="controls">
+        <input type="text" id="busqueda" placeholder="Buscar producto..." oninput="filtrar()">
+        <button class="btn-ia" onclick="document.getElementById('inputImagen').click()">🤖 Analizar Imagen</button>
+        <input type="file" id="inputImagen" style="display:none" accept="image/*" onchange="subirEscanear(this)">
+    </div>
+
+    <div id="productos" class="grid">Cargando base de datos...</div>
+
+    <script>
+        const USER_EMAIL = 'ignaciogalmes79@gmail.com';
+        let localCache = [];
+
+        async function cargar() {
+            try {
+                const res = await fetch('/api/productos', { headers: { 'x-user-email': USER_EMAIL } });
+                const json = await res.json();
+                localCache = json.data || [];
+                render(localCache);
+            } catch (e) { console.error("Error al cargar:", e); }
+        }
+
+        function render(lista) {
+            const container = document.getElementById('productos');
+            container.innerHTML = lista.map(p => `
+                <div class="card">
+                    <img src="${p.imagen_url || 'https://via.placeholder.com/150'}">
+                    <h3>${p.nombre}</h3>
+                    <p style="color:#95a5a6">${p.marca}</p>
+                    <div class="badge">$ <span class="numero">${parseFloat(p.precio_sugerido).toFixed(2)}</span></div>
+                    ${p.codigo_barras ? `<p style="font-size:0.7em; margin-top:10px;">EAN: <span class="ean">${p.codigo_barras}</span></p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function filtrar() {
+            const term = document.getElementById('busqueda').value.toLowerCase();
+            render(localCache.filter(p => p.nombre.toLowerCase().includes(term) || p.marca.toLowerCase().includes(term)));
+        }
+
+        async function subirEscanear(input) {
+            if (!input.files[0]) return;
+            const formData = new FormData();
+            formData.append('imagen', input.files[0]);
+
+            alert("Subiendo a Cloudinary y analizando con Gemini 2.0...");
+
+            try {
+                const res = await fetch('/api/productos/detectar', {
+                    method: 'POST',
+                    headers: { 'x-user-email': USER_EMAIL },
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ ¡Sincronizado! Se procesaron ${data.count} productos.`);
+                    cargar(); // Recarga la lista
+                }
+            } catch (e) { alert("Error en el escaneo."); }
+        }
+
+        window.onload = cargar;
+    </script>
+</body>
+</html>

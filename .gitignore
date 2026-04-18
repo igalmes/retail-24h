@@ -3,3 +3,10 @@ node_modules/
 dist/
 .DS_Store
 public/uploads/*
+*.log
+npm-debug.log*
+.vscode/
+.wwebjs_auth/
+.wwebjs_cache/
+test.jpg
+test-models.js

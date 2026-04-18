@@ -1,0 +1,112 @@
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+const Producto = require('../models/Producto');
+const geminiService = require('./geminiService');
+
+// Diccionario para almacenar las sesiones activas { userId: clientInstance }
+const sessions = {};
+
+/**
+ * Inicializa la sesión de WhatsApp para un usuario específico (dueño de negocio)
+ * @param {number} userId - El ID del usuario en la base de datos
+ */
+const initialize = async (userId = 1) => { // Por defecto 1 para tu admin
+    if (sessions[userId]) {
+        console.log(`ℹ️ [BOT]: Sesión para usuario ${userId} ya está activa.`);
+        return sessions[userId];
+    }
+
+    console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
+
+    const client = new Client({
+        authStrategy: new LocalAuth({
+            clientId: `user-session-${userId}` // Crea carpetas separadas por usuario
+        }),
+        puppeteer: {
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage','--disable-extensions','--single-process','--no-zygote'],
+        }
+    });
+
+    client.on('qr', (qr) => {
+        // En el futuro, esto se enviará al frontend via Socket.io
+        console.log(`\n-------------------------------------------------------`);
+        console.log(`✅ [BOT]: QR GENERADO PARA USUARIO ${userId}`);
+        qrcode.generate(qr, { small: true });
+        console.log(`-------------------------------------------------------\n`);
+    });
+
+    client.on('ready', () => {
+        console.log(`🚀 [BOT]: WhatsApp de Usuario ${userId} conectado y operando.`);
+    });
+
+    client.on('message_create', async (msg) => {
+        const textoOriginal = msg.body.trim();
+        const textoLower = textoOriginal.toLowerCase();
+
+        // Filtros básicos
+        if (!msg.from.endsWith('@c.us')) return;
+
+        const esComandoAdmin = textoLower === 'ping' || textoLower.startsWith('stock ');
+        const tieneTriggerIA = textoLower.startsWith('bot');
+
+        if (!esComandoAdmin && !tieneTriggerIA) return;
+
+        // --- LÓGICA DE COMANDOS (Filtrada por UsuarioId) ---
+
+        if (textoLower === 'ping') {
+            return msg.reply('pong! 🏓');
+        }
+
+        if (textoLower.startsWith('stock ')) {
+            const ean = textoLower.split(' ')[1];
+            try {
+                // IMPORTANTE: Solo busca productos que PERTENECEN a este usuario
+                const producto = await Producto.findOne({ 
+                    where: { 
+                        codigo_barras: ean,
+                        UsuarioId: userId 
+                    } 
+                });
+
+                if (!producto) return msg.reply("❌ Producto no encontrado en tu inventario.");
+                return msg.reply(`📦 *${producto.nombre}*\n📉 Stock: ${producto.stock_actual}\n💰 Precio: $${producto.precio_sugerido}`);
+            } catch (e) {
+                console.error("Error stock:", e.message);
+                return msg.reply("❌ Error al consultar base de datos.");
+            }
+        }
+
+        // --- CAPA DE IA (Filtrada por UsuarioId) ---
+        
+        if (msg.fromMe && tieneTriggerIA) {
+            console.log("🛠️ [TEST]: Procesando mensaje propio (Trigger activado)");
+        }
+
+        if (tieneTriggerIA && (!msg.fromMe || textoLower.startsWith('bot'))) {
+            try {
+                const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
+                const respuestaIA = await geminiService.procesarChatBot(consultaIA);
+
+                if (respuestaIA.esPedido && respuestaIA.items.length > 0) {
+                    let res = `🛒 *Pedido en ${userId === 1 ? 'Tu Comercio' : 'Comercio ' + userId}:*\n\n`;
+                    respuestaIA.items.forEach(p => {
+                        res += `- ${p.cantidad}x ${p.producto}\n`;
+                    });
+                    res += `\n¿Es correcto? (Responde *SÍ* para confirmar)`;
+                    await msg.reply(res);
+                } else {
+                    await msg.reply(respuestaIA.mensaje);
+                }
+            } catch (error) {
+                console.error("❌ Error Capa IA:", error.message);
+            }
+        }
+    });
+
+    client.initialize();
+    sessions[userId] = client;
+    return client;
+};
+
+// Exportamos la función de inicialización y el diccionario de sesiones
+module.exports = { initialize, sessions };

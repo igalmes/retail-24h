@@ -1,95 +1,127 @@
 const Producto = require('../models/Producto');
 const geminiService = require('../services/geminiService');
 const axios = require('axios');
+const util = require('util');
 
 exports.detectarYGuardar = async (req, res) => {
+    console.log(">>> 1. Entrando a detectarYGuardar");
     try {
-        // Validación de archivo (Multer + Cloudinary)
-        if (!req.file) return res.status(400).json({ error: "No se recibió imagen" });
+        if (!req.file) {
+            console.log(">>> 2. Error: No hay file");
+            return res.status(400).json({ error: "No se recibió imagen" });
+        }
 
-        // IMPORTANTE: req.file.path ahora es la URL de Cloudinary (https://res.cloudinary.com/...)
         const imageUrl = req.file.path; 
+        console.log(">>> 3. URL de Cloudinary:", imageUrl);
 
-        // 1. Gemini analiza la imagen usando la URL de la nube
-        const productosIA = await geminiService.analizarGondola(imageUrl);
+        console.log(">>> 4. Llamando a Gemini...");
+        let productosIA;
+        try {
+            productosIA = await geminiService.analizarGondola(imageUrl);
+            console.log(">>> 5. Respuesta de Gemini recibida. Cantidad:", productosIA?.length);
+        } catch (geminiErr) {
+            console.log(">>> ERROR EN GEMINI STEP:", geminiErr.message);
+            throw geminiErr;
+        }
         
-        // 2. Mapeamos y consultamos el dataset SEPA (ArgentinaDatos)
-        const productosConPrecioReal = await Promise.all(productosIA.map(async (p) => {
-            let precioSEPA = 0;
+        if (!productosIA || productosIA.length === 0) {
+            return res.status(200).json({ mensaje: "No detectado", count: 0 });
+        }
 
-            // Consultar EAN en API de precios claros si existe
-            if (p.ean && p.ean !== "null") {
+        console.log(">>> 6. Mapeando productos con UsuarioId...");
+        const productosConPrecioReal = await Promise.all(productosIA.map(async (p) => {
+            let precioSEPA = p.precio_sugerido || 0;
+            if (p.ean && p.ean !== "null" && p.ean.length >= 8) {
                 try {
                     const resSepa = await axios.get(`https://api.argentinadatos.com/v1/consumo/precios?ean=${p.ean}`);
-                    // Tomamos el precio último reportado o el sugerido por la IA como backup
-                    precioSEPA = resSepa.data.precioUltimo || p.precio_sugerido || 0;
+                    if (resSepa.data && resSepa.data.precioUltimo) precioSEPA = resSepa.data.precioUltimo;
                 } catch (e) { 
-                    console.log(`EAN ${p.ean} no encontrado. Usando backup de IA.`);
-                    precioSEPA = p.precio_sugerido || 0;
+                    console.log(">>> 6b. EAN no encontrado en SEPA:", p.ean);
                 }
-            } else {
-                precioSEPA = p.precio_sugerido || 0;
             }
-
             return {
                 nombre: p.nombre,
                 marca: p.marca,
-                categoria: p.categoria,
+                categoria: p.categoria || 'General',
                 precio_sugerido: Number(precioSEPA), 
                 codigo_barras: (p.ean === "null" || !p.ean) ? null : p.ean,
-                imagen_url: imageUrl // Guardamos la URL de Cloudinary, no localhost
+                imagen_url: imageUrl,
+                // --- CAMBIO CLAVE: Asignamos el dueño del producto ---
+                UsuarioId: req.user.id 
             };
         }));
 
-        // 3. Guardar en DB (Update on duplicate por si el producto ya existe)
+        console.log(">>> 7. Guardando en Base de Datos (BulkCreate con UsuarioId)...");
+        // Agregamos UsuarioId al updateOnDuplicate por si el usuario resube el mismo EAN
         const productosGuardados = await Producto.bulkCreate(productosConPrecioReal, {
-            updateOnDuplicate: ["precio_sugerido", "imagen_url", "updatedAt"]
+            updateOnDuplicate: ["precio_sugerido", "imagen_url", "updatedAt", "UsuarioId"]
         });
 
-        res.status(201).json({ 
-            mensaje: "Escaneo y sincronización SEPA exitosa", 
-            count: productosGuardados.length 
-        });
+        console.log(">>> 8. Éxito total para usuario:", req.user.id);
+        res.status(201).json({ mensaje: "Éxito", count: productosGuardados.length });
 
     } catch (error) {
-        console.error("Error crítico en controlador:", error);
-        res.status(500).json({ error: "Fallo en el procesamiento de IA o base de datos" });
+        console.log(">>> CATCH DEL CONTROLADOR ACTIVADO");
+        console.error("MENSAJE DE ERROR:", error.message || "Sin mensaje");
+        res.status(500).json({ error: "Error interno", details: error.message });
     }
 };
-
 exports.obtenerTodos = async (req, res) => {
     try {
-        const productos = await Producto.findAll({ order: [['createdAt', 'DESC']] });
-        const data = productos.map(p => {
-            const prod = p.toJSON();
-            return {
-                ...prod,
-                fotoUrl: prod.imagen_url, // URL de Cloudinary
-                precio_actualizado: prod.precio_sugerido,
-                tendencia: 'equal'
-            };
+        const productos = await Producto.findAll({ 
+            where: { UsuarioId: req.user.id } // <--- SOLO los del usuario logueado
         });
-        res.json({ data });
+        res.json(productos);
     } catch (error) {
-        res.status(500).json({ error: "Error al obtener productos" });
+        res.status(500).json({ error: error.message });
     }
 };
-
 exports.actualizar = async (req, res) => {
     try {
-        const { id } = req.params;
-        await Producto.update(req.body, { where: { id } });
-        res.json({ mensaje: "Actualizado con éxito" });
-    } catch (error) { 
-        res.status(500).json({ error: "Error al actualizar" }); 
-    }
+        await Producto.update(req.body, { where: { id: req.params.id } });
+        res.json({ mensaje: "Actualizado" });
+    } catch (error) { res.status(500).json({ error: "Error" }); }
 };
 
 exports.eliminar = async (req, res) => {
     try {
         await Producto.destroy({ where: { id: req.params.id } });
         res.json({ mensaje: "Eliminado" });
-    } catch (error) { 
-        res.status(500).json({ error: "Error al eliminar" }); 
+    } catch (error) { res.status(500).json({ error: "Error" }); }
+};
+
+// Agregá esto a tu productoController.js
+exports.buscarPorCodigo = async (req, res) => {
+    try {
+        const { ean } = req.params;
+        const producto = await Producto.findOne({ where: { codigo_barras: ean } });
+        
+        if (!producto) {
+            return res.status(404).json({ error: "Producto no encontrado en inventario" });
+        }
+        res.json(producto);
+    } catch (error) {
+        res.status(500).json({ error: "Error al buscar producto" });
+    }
+};
+exports.ajustarStock = async (req, res) => {
+    try {
+        const { ean } = req.params;
+        const { cantidad } = req.body; // Puede ser positivo (10) o negativo (-2)
+
+        const producto = await Producto.findOne({ where: { codigo_barras: ean } });
+        if (!producto) return res.status(404).json({ error: "Producto no encontrado" });
+
+        // Sumamos algebraicamente al stock actual
+        producto.stock_actual += parseInt(cantidad);
+        await producto.save();
+
+        res.json({ 
+            mensaje: "Stock actualizado", 
+            nuevo_stock: producto.stock_actual,
+            producto: producto.nombre 
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Error al actualizar stock" });
     }
 };

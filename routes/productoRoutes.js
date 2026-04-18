@@ -4,44 +4,65 @@ const productoController = require('../controllers/productoController');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const rateLimit = require('express-rate-limit');
 
-// 1. Forzamos la carga de variables de entorno inmediatamente
 require('dotenv').config();
 
-// 2. Configuración Multicapa: Busca todos los nombres posibles (locales y de Render)
+// 1. Configuración de Cloudinary
+// Usamos nombres estándar para evitar confusiones
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_NAME || process.env.CLOUD_NAME || 'dthve8h8s',
-  api_key: process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_KEY || process.env.API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET || process.env.CLOUDINARY_SECRET || process.env.API_SECRET
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 3. Log de Diagnóstico: Nos avisa en la terminal de VS Code o Render si algo falta
-if (!process.env.CLOUDINARY_API_KEY && !process.env.CLOUDINARY_KEY && !process.env.API_KEY) {
-  console.error("⚠️ [CRÍTICO]: No se detectó ninguna API_KEY de Cloudinary en las variables de entorno.");
-} else {
-  console.log("✅ [SISTEMA]: Cloudinary inicializado correctamente.");
-}
+// 2. Verificación de carga (Esto saldrá en tu PowerShell)
+console.log("--- [DEBUG ROUTES] Verificando Env ---");
+console.log("Cloud Name:", process.env.CLOUDINARY_NAME ? "✅ OK" : "❌ FALTANTE");
+console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✅ OK" : "❌ FALTANTE");
+console.log("--------------------------------------");
 
-// 4. Configuración del almacenamiento en la nube
+// 3. Configuración del almacenamiento
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'retail-24h-uploads',
-    allowed_formats: ['jpg', 'png', 'jpeg'],
+    allowed_formats: ['jpg', 'png', 'jpeg','webp'],
   },
 });
 
-// 5. Middleware de Multer para procesar la subida
-const upload = multer({ storage });
+// 4. Middleware de Multer con manejo de errores interno
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // Límite de 5MB por imagen
+});
 
-// --- RUTAS ---
+// --- DEFINICIÓN DE RUTAS ---
 
-// Escaneo con IA: Sube a Cloudinary y luego procesa con Gemini
-router.post('/detectar', upload.single('imagen'), productoController.detectarYGuardar);
+// POST: Analizar imagen (IA)
+// Agregamos un pequeño fix para capturar errores de subida antes del controlador
+router.post('/detectar', (req, res, next) => {
+  upload.single('imagen')(req, res, (err) => {
+    if (err) {
+      console.error("❌ [MULTER/CLOUDINARY ERROR]:", err.message);
+      return res.status(500).json({ error: "Error al subir a la nube", details: err.message });
+    }
+    next();
+  });
+}, productoController.detectarYGuardar);
 
-// CRUD de Productos
+const scanLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // limita cada IP a 100 peticiones por ventana
+    message: "Demasiadas consultas desde este dispositivo."
+});
+
+// Nueva ruta para el bot
+router.get('/buscar/:ean', scanLimiter, productoController.buscarPorCodigo);
+
 router.get('/', productoController.obtenerTodos);
 router.put('/:id', productoController.actualizar);
 router.delete('/:id', productoController.eliminar);
+router.put('/stock/:ean', productoController.ajustarStock);
 
 module.exports = router;

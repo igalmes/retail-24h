@@ -1,53 +1,71 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const axios = require("axios"); // Necesario para leer la URL de Cloudinary
+const axios = require("axios");
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
+const MODELO = "gemini-2.5-flash";
+const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
 
-const analizarGondola = async (imageUrl) => {
-    // Usamos el modelo gemini-2.0-flash (o el que tengas configurado)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+/**
+ * Helper para limpiar el formato Markdown que a veces devuelve la IA
+ */
+const limpiarJSON = (texto) => {
+    return texto.replace(/```json/g, "").replace(/```/g, "").trim();
+};
 
-    const prompt = `Analiza este producto en Argentina.
-    Busca el código de barras (EAN-13). Si no es visible en la imagen, intenta identificar el producto por Marca y Variedad exacta para inferir su categoría.
-    Devuelve un JSON estrictamente con este formato:
-    [{ 
-      "nombre": "Nombre exacto del producto", 
-      "ean": "13 dígitos del código de barras (solo si es visible, sino null)", 
-      "marca": "Marca",
-      "categoria": "Categoría (Bebidas, Tabaco, Snacks, etc)",
-      "precio_sugerido": 0
-    }]
-    Solo devuelve el JSON, sin texto extra ni formato markdown.`;
-
+// Función para el Bot de WhatsApp (Texto)
+const procesarChatBot = async (mensajeUsuario) => {
     try {
-        // 1. Descargamos la imagen desde la URL de Cloudinary a un Buffer
+        const payload = {
+            contents: [{
+                parts: [{
+                    text: `Eres el asistente de "Retail 24h". Analiza el mensaje y responde ESTRICTAMENTE en JSON.
+                    Reglas: 
+                    1. Si es pedido: {"esPedido": true, "items": [{"producto": "nombre", "cantidad": 1}], "mensaje": "Resumen"}
+                    2. Si no es pedido: {"esPedido": false, "items": [], "mensaje": "Saludo o respuesta amable"}
+                    
+                    Mensaje: "${mensajeUsuario}"`
+                }]
+            }]
+        };
+
+        const result = await axios.post(url, payload);
+        const rawText = result.data.candidates[0].content.parts[0].text;
+        return JSON.parse(limpiarJSON(rawText));
+    } catch (error) {
+        console.error(`❌ Error Gemini Texto (${MODELO}):`, error.message);
+        return { esPedido: false, items: [], mensaje: "Hola! ¿En qué puedo ayudarte?" };
+    }
+};
+
+// Función para analizar imágenes (Góndola)
+const analizarGondola = async (imageUrl) => {
+    try {
+        console.log(">>> 4. Descargando imagen para Gemini...");
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Data = Buffer.from(responseImage.data).toString('base64');
 
-        // 2. Preparamos el objeto para Gemini
-        const imagePart = {
-            inlineData: {
-                data: base64Data,
-                mimeType: "image/jpeg", // Cloudinary suele normalizar a jpeg/png
-            },
+        const payload = {
+            contents: [{
+                parts: [
+                    { text: "Analiza esta imagen de góndola. Busca productos y sus EAN-13. Devuelve estrictamente un JSON array: [{ \"nombre\": \"...\", \"ean\": \"...\", \"marca\": \"...\", \"precio_sugerido\": 0 }]. Si no hay EAN, genera uno aleatorio de 8 dígitos." },
+                    { inline_data: { mime_type: "image/jpeg", data: base64Data } }
+                ]
+            }]
         };
 
-        // 3. Generamos el contenido
-        const result = await model.generateContent([prompt, imagePart]);
-        const response = await result.response;
-        let text = response.text();
+        console.log(`>>> 5. Llamando a Gemini API (${MODELO})...`);
+        const result = await axios.post(url, payload);
         
-        // Limpiamos posibles formatos markdown (```json ... ```)
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) throw new Error("Formato JSON no válido recibido de la IA");
-        
-        return JSON.parse(jsonMatch[0]);
+        if (!result.data.candidates || result.data.candidates.length === 0) {
+            throw new Error("Gemini no devolvió candidatos.");
+        }
 
+        const rawText = result.data.candidates[0].content.parts[0].text;
+        return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
-        console.error("Error en Gemini Service:", error.message);
+        console.error(`❌ Error Gemini Imagen (${MODELO}):`, error.message);
         throw error;
     }
 };
 
-module.exports = { analizarGondola };
+module.exports = { analizarGondola, procesarChatBot };
