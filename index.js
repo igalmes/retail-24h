@@ -101,3 +101,5 @@ sequelize.sync({ force: true })
     .catch(err => {
         console.error('❌ [CRITICAL ERROR]:', err.message);
     });
+
+// Forzando deploy final 3
