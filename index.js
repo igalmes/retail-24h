@@ -87,39 +87,45 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// --- ARRANQUE Y SINCRONIZACIÓN FORZADA (CLEAN SLATE) ---
+// --- ARRANQUE Y SINCRONIZACIÓN ATÓMICA ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión establecida con Aiven. Iniciando Hard Reset...');
+        console.log('📡 Conexión establecida con Aiven. Ejecutando limpieza profunda...');
 
-        // 1. ELIMINACIÓN MANUAL DE RESTRICCIONES Y TABLAS
-        // Nota: 'productos' va en minúscula porque así está en el modelo
+        // 1. ELIMINACIÓN TOTAL (Bypass de FK y limpieza de nombres)
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+        
+        // Borramos todas las variantes posibles de nombres
         await sequelize.query('DROP TABLE IF EXISTS PedidoItems');
         await sequelize.query('DROP TABLE IF EXISTS Pedidos');
         await sequelize.query('DROP TABLE IF EXISTS productos'); 
+        await sequelize.query('DROP TABLE IF EXISTS Productos'); 
         await sequelize.query('DROP TABLE IF EXISTS Usuarios');
-        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
         
-        console.log('📡 [LIMPIEZA]: Tablas eliminadas (Bypass de FK activo).');
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        console.log('📡 [LIMPIEZA]: Base de datos purgada.');
 
-        // 2. SINCRONIZAR DE CERO
+        // 2. SINCRONIZAR (Usamos alter: false dentro de force para evitar duplicados)
         await sequelize.sync({ force: true });
-        console.log('📡 [SYSTEM]: Estructura de tablas recreada con éxito.');
+        console.log('📡 [SYSTEM]: Estructura recreada sin conflictos de FK.');
 
-        // 3. INICIALIZAR ADMIN Y ARRANCAR EXPRESS
+        // 3. INICIALIZAR ADMIN Y ARRANCAR
         await inicializarAdmin();
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 [READY]: Retail 24h AI operativo en puerto ${PORT}`);
-            // whatsappBot.initialize(1); 
         });
 
     } catch (err) {
         console.error('❌ [CRITICAL ERROR]:', err.message);
-        process.exit(1);
+        // Si el error es por nombre duplicado, forzamos un segundo intento tras pausa
+        if (err.message.includes('Duplicate foreign key')) {
+            console.log('🔄 Reintentando sincronización en 3 segundos...');
+            setTimeout(startServer, 3000);
+        } else {
+            process.exit(1);
+        }
     }
 };
-
 startServer();
