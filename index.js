@@ -5,7 +5,7 @@ const cors = require('cors');
 const sequelize = require('./config/db'); 
 const whatsappBot = require('./services/whatsappService');
 const authRoutes = require('./routes/authRoutes');
-const verifyToken = require('./middleware/auth'); // <--- USAMOS EL NUEVO MIDDLEWARE HÍBRIDO
+const verifyToken = require('./middleware/auth');
 
 // --- DEBUG DE VARIABLES ---
 console.log("--- [DEBUG] ESTADO DE VARIABLES DE ENTORNO ---");
@@ -43,7 +43,7 @@ const inicializarAdmin = async () => {
         const [admin, created] = await Usuario.findOrCreate({
             where: { email: 'ignaciogalmes79@gmail.com' },
             defaults: { 
-                nombre: 'Ignacio Galmes', // Agregamos nombre para evitar el error de columna
+                nombre: 'Ignacio Galmes',
                 password: 'password_provisoria_123',
                 rol: 'admin'
             }
@@ -73,11 +73,12 @@ const pagoRoutes = require('./routes/pagoRoutes');
 // RUTAS PÚBLICAS (Login)
 app.use('/api/auth', authRoutes);
 
-// RUTAS PROTEGIDAS (Usamos verifyToken en lugar de checkAivenAuth)
+// RUTAS PROTEGIDAS
 app.use('/api/productos', verifyToken, productoRoutes); 
 app.use('/api/pagos', verifyToken, pagoRoutes); 
 
 app.use(express.static(path.join(__dirname, 'public')));
+
 app.get('/api/status', (req, res) => {
     res.status(200).json({ status: "online", service: "Retail 24h AI" });
 });
@@ -86,20 +87,40 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// --- ARRANQUE Y SINCRONIZACIÓN ---
-// Cambiamos a alter: true una sola vez si seguís teniendo el error de columna nombre
-sequelize.sync({ force: true }) 
-    .then(() => {
-        console.log('📡 [SYSTEM]: Conexión con base de datos Aiven establecida.');
-        inicializarAdmin().then(() => {
-            app.listen(PORT, '0.0.0.0', () => {
-                console.log(`🚀 [READY]: Retail 24h AI operativo en puerto ${PORT}`);
-               // whatsappBot.initialize(1); // Inicializamos el bot después de la DB
-            });
-        });
-    })
-    .catch(err => {
-        console.error('❌ [CRITICAL ERROR]:', err.message);
-    });
+// --- ARRANQUE Y SINCRONIZACIÓN FORZADA ---
+const startServer = async () => {
+    try {
+        await sequelize.authenticate();
+        console.log('📡 Conexión establecida con Aiven. Iniciando limpieza...');
 
-// Forzando deploy final 3
+        // 1. DESACTIVAR CHECKS Y BORRAR TABLAS REBELDES MANUALMENTE
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+        await sequelize.query('DROP TABLE IF EXISTS PedidoItems');
+        await sequelize.query('DROP TABLE IF EXISTS Pedidos');
+        await sequelize.query('DROP TABLE IF EXISTS Productos');
+        await sequelize.query('DROP TABLE IF EXISTS Usuarios');
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        
+        console.log('📡 [LIMPIEZA]: Tablas eliminadas por bypass de seguridad.');
+
+        // 2. SINCRONIZAR DE CERO
+        await sequelize.sync({ force: true });
+        console.log('📡 [SYSTEM]: Estructura de tablas recreada con éxito.');
+
+        // 3. INICIALIZAR ADMIN Y ARRANCAR EXPRESS
+        await inicializarAdmin();
+        
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🚀 [READY]: Retail 24h AI operativo en puerto ${PORT}`);
+            // whatsappBot.initialize(1); 
+        });
+
+    } catch (err) {
+        console.error('❌ [CRITICAL ERROR]:', err.message);
+        process.exit(1); // Cerramos si hay error crítico
+    }
+};
+
+startServer();
+
+// Forzando deploy final - Clean Slate Protocol
