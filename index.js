@@ -12,18 +12,40 @@ const Producto = require('./models/Producto');
 const Pedido = require('./models/Pedido');
 const PedidoItem = require('./models/PedidoItem');
 
-// --- ASOCIACIONES EXPLÍCITAS ---
+// --- GENERADOR DE NOMBRES ÚNICOS PARA CONSTRAINTS ---
+// Esto evita el error "Duplicate foreign key constraint name"
+const uid = Math.floor(Math.random() * 10000);
+
+// --- ASOCIACIONES CON NOMBRES DINÁMICOS ---
 Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
 Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId' });
 
 Usuario.hasMany(Pedido, { foreignKey: 'UsuarioId' });
 Pedido.belongsTo(Usuario, { foreignKey: 'UsuarioId' });
 
-Pedido.hasMany(PedidoItem, { foreignKey: { name: 'PedidoId', allowNull: false }, onDelete: 'CASCADE' });
-PedidoItem.belongsTo(Pedido, { foreignKey: { name: 'PedidoId', allowNull: false } });
+// PedidoItem -> Pedido
+Pedido.hasMany(PedidoItem, { 
+    foreignKey: { name: 'PedidoId', allowNull: false }, 
+    onDelete: 'CASCADE',
+    constraints: true,
+    foreignKeyConstraintName: `fk_pedido_item_ped_${uid}` // Nombre único
+});
+PedidoItem.belongsTo(Pedido, { 
+    foreignKey: { name: 'PedidoId', allowNull: false },
+    foreignKeyConstraintName: `fk_pedido_item_ped_rev_${uid}`
+});
 
-Producto.hasMany(PedidoItem, { foreignKey: { name: 'ProductoId', allowNull: false }, onDelete: 'CASCADE' });
-PedidoItem.belongsTo(Producto, { foreignKey: { name: 'ProductoId', allowNull: false } });
+// PedidoItem -> Producto
+Producto.hasMany(PedidoItem, { 
+    foreignKey: { name: 'ProductoId', allowNull: false }, 
+    onDelete: 'CASCADE',
+    constraints: true,
+    foreignKeyConstraintName: `fk_pedido_item_prod_${uid}` // Nombre único
+});
+PedidoItem.belongsTo(Producto, { 
+    foreignKey: { name: 'ProductoId', allowNull: false },
+    foreignKeyConstraintName: `fk_pedido_item_prod_rev_${uid}`
+});
 
 // --- INICIALIZAR ADMIN ---
 const inicializarAdmin = async () => {
@@ -48,7 +70,6 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'] }));
 app.use(express.json());
 
-// RUTAS
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes')); 
 app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes')); 
@@ -60,31 +81,21 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión con Aiven OK. Iniciando Reconstrucción...');
+        console.log(`📡 Conexión OK. ID Sesión: ${uid}. Reconstruyendo...`);
 
-        // 1. Limpieza total con checks desactivados
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-        const tablas = ['PedidoItems', 'Pedidos', 'productos', 'Usuarios'];
-        for (const tabla of tablas) {
-            await sequelize.query(`DROP TABLE IF EXISTS ${tabla}`);
-        }
+        await sequelize.query('DROP TABLE IF EXISTS PedidoItems, Pedidos, productos, Productos, Usuarios');
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
         console.log('🧹 DB Limpia.');
 
-        // 2. Sincronización por ORDEN DE JERARQUÍA
+        // Sincronización manual en orden estricto
         await Usuario.sync({ force: true });
-        console.log('✅ Usuarios OK.');
-        
         await Producto.sync({ force: true });
         await Pedido.sync({ force: true });
-        console.log('✅ Productos y Pedidos OK.');
-        
         await PedidoItem.sync({ force: true });
-        console.log('✅ PedidoItems OK.');
-
-        // Sincronización final para asentar asociaciones
-        await sequelize.sync(); 
         
+        console.log('✅ Estructura recreada con IDs únicos.');
+
         await inicializarAdmin();
         
         app.listen(PORT, '0.0.0.0', () => {
