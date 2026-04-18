@@ -3,52 +3,29 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const sequelize = require('./config/db'); 
-const whatsappBot = require('./services/whatsappService');
 const authRoutes = require('./routes/authRoutes');
 const verifyToken = require('./middleware/auth');
 
-// --- DEBUG DE VARIABLES ---
-console.log("--- [DEBUG] ESTADO DE VARIABLES DE ENTORNO ---");
-console.log("PORT:", process.env.PORT || "4000");
-console.log("DB_HOST:", process.env.DB_HOST ? "✅ CONFIGURADO" : "❌ FALTA");
-console.log("----------------------------------------------");
-
-process.on('uncaughtException', (err) => {
-    console.error("❌ ERROR CRÍTICO NO CAPTURADO:", err.message);
-});
-
-// --- MODELOS Y ASOCIACIONES ---
+// --- MODELOS ---
 const Usuario = require('./models/Usuario');
 const Producto = require('./models/Producto');
 const Pedido = require('./models/Pedido');
 const PedidoItem = require('./models/PedidoItem');
 
-// Relaciones de Usuario (Dueño del negocio)
+// --- ASOCIACIONES EXPLÍCITAS ---
 Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
 Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId' });
 
 Usuario.hasMany(Pedido, { foreignKey: 'UsuarioId' });
 Pedido.belongsTo(Usuario, { foreignKey: 'UsuarioId' });
 
-// Relaciones de Pedidos y Productos (CON NOMBRES EXPLÍCITOS PARA EVITAR DUPLICADOS)
-// Usamos nombres únicos para las FKs para que MySQL no use los nombres genéricos antiguos
-Pedido.hasMany(PedidoItem, { 
-    foreignKey: { name: 'PedidoId', allowNull: false },
-    onDelete: 'CASCADE' 
-});
-PedidoItem.belongsTo(Pedido, { 
-    foreignKey: { name: 'PedidoId', allowNull: false } 
-});
+Pedido.hasMany(PedidoItem, { foreignKey: { name: 'PedidoId', allowNull: false }, onDelete: 'CASCADE' });
+PedidoItem.belongsTo(Pedido, { foreignKey: { name: 'PedidoId', allowNull: false } });
 
-Producto.hasMany(PedidoItem, { 
-    foreignKey: { name: 'ProductoId', allowNull: false },
-    onDelete: 'CASCADE'
-});
-PedidoItem.belongsTo(Producto, { 
-    foreignKey: { name: 'ProductoId', allowNull: false } 
-});
+Producto.hasMany(PedidoItem, { foreignKey: { name: 'ProductoId', allowNull: false }, onDelete: 'CASCADE' });
+PedidoItem.belongsTo(Producto, { foreignKey: { name: 'ProductoId', allowNull: false } });
 
-// --- AUTO-REGISTRO ADMIN ---
+// --- INICIALIZAR ADMIN ---
 const inicializarAdmin = async () => {
     try {
         const [admin, created] = await Usuario.findOrCreate({
@@ -59,70 +36,55 @@ const inicializarAdmin = async () => {
                 rol: 'admin'
             }
         });
-        console.log(created ? "✅ [AIVEN]: Admin creado." : "ℹ️ [AIVEN]: Admin verificado.");
+        console.log(created ? "✅ [ADMIN]: Creado." : "ℹ️ [ADMIN]: Verificado.");
     } catch (error) {
-        console.error("❌ [AIVEN]: Error al inicializar admin:", error.message);
+        console.error("❌ [ADMIN ERROR]:", error.message);
     }
 };
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// --- CONFIGURACIÓN DE MIDDLEWARES ---
-app.use(cors({
-    origin: '*', 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email']
-}));
-
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'] }));
 app.use(express.json());
 
-// --- RUTAS API ---
-const productoRoutes = require('./routes/productoRoutes');
-const pagoRoutes = require('./routes/pagoRoutes');
-
-// RUTAS PÚBLICAS
+// RUTAS
 app.use('/api/auth', authRoutes);
-
-// RUTAS PROTEGIDAS
-app.use('/api/productos', verifyToken, productoRoutes); 
-app.use('/api/pagos', verifyToken, pagoRoutes); 
+app.use('/api/productos', verifyToken, require('./routes/productoRoutes')); 
+app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes')); 
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.get('/api/status', (req, res) => {
-    res.status(200).json({ status: "online", service: "Retail 24h AI" });
-});
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// --- ARRANQUE Y SINCRONIZACIÓN ATÓMICA ---
+// --- ARRANQUE SECUENCIAL ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión establecida con Aiven. Ejecutando limpieza profunda...');
+        console.log('📡 Conexión con Aiven OK. Iniciando Reconstrucción...');
 
-        // 1. ELIMINACIÓN TOTAL (Bypass de FK y limpieza de nombres)
+        // 1. Limpieza total con checks desactivados
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-        
-        // Borramos todas las tablas involucradas
-        await sequelize.query('DROP TABLE IF EXISTS PedidoItems');
-        await sequelize.query('DROP TABLE IF EXISTS Pedidos');
-        await sequelize.query('DROP TABLE IF EXISTS productos'); 
-        await sequelize.query('DROP TABLE IF EXISTS Productos'); 
-        await sequelize.query('DROP TABLE IF EXISTS Usuarios');
-        
+        const tablas = ['PedidoItems', 'Pedidos', 'productos', 'Usuarios'];
+        for (const tabla of tablas) {
+            await sequelize.query(`DROP TABLE IF EXISTS ${tabla}`);
+        }
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
-        console.log('📡 [LIMPIEZA]: Base de datos purgada.');
+        console.log('🧹 DB Limpia.');
 
-        // 2. SINCRONIZAR 
-        // Force: true creará las tablas y las FKs con los nombres explícitos definidos arriba
-        await sequelize.sync({ force: true });
-        console.log('📡 [SYSTEM]: Estructura recreada exitosamente.');
+        // 2. Sincronización por ORDEN DE JERARQUÍA
+        await Usuario.sync({ force: true });
+        console.log('✅ Usuarios OK.');
+        
+        await Producto.sync({ force: true });
+        await Pedido.sync({ force: true });
+        console.log('✅ Productos y Pedidos OK.');
+        
+        await PedidoItem.sync({ force: true });
+        console.log('✅ PedidoItems OK.');
 
-        // 3. INICIALIZAR ADMIN Y ARRANCAR
+        // Sincronización final para asentar asociaciones
+        await sequelize.sync(); 
+        
         await inicializarAdmin();
         
         app.listen(PORT, '0.0.0.0', () => {
@@ -131,8 +93,7 @@ const startServer = async () => {
 
     } catch (err) {
         console.error('❌ [CRITICAL ERROR]:', err.message);
-        // Salimos para evitar loops en Render; el log nos dirá si persiste el duplicado
-        process.exit(1); 
+        process.exit(1);
     }
 };
 
