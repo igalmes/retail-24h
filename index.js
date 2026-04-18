@@ -70,7 +70,7 @@ app.use(express.json());
 const productoRoutes = require('./routes/productoRoutes');
 const pagoRoutes = require('./routes/pagoRoutes');
 
-// RUTAS PÚBLICAS (Login)
+// RUTAS PÚBLICAS
 app.use('/api/auth', authRoutes);
 
 // RUTAS PROTEGIDAS
@@ -87,21 +87,22 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// --- ARRANQUE Y SINCRONIZACIÓN FORZADA ---
+// --- ARRANQUE Y SINCRONIZACIÓN FORZADA (CLEAN SLATE) ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión establecida con Aiven. Iniciando limpieza...');
+        console.log('📡 Conexión establecida con Aiven. Iniciando Hard Reset...');
 
-        // 1. DESACTIVAR CHECKS Y BORRAR TABLAS REBELDES MANUALMENTE
+        // 1. ELIMINACIÓN MANUAL DE RESTRICCIONES Y TABLAS
+        // Nota: 'productos' va en minúscula porque así está en el modelo
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
         await sequelize.query('DROP TABLE IF EXISTS PedidoItems');
         await sequelize.query('DROP TABLE IF EXISTS Pedidos');
-        await sequelize.query('DROP TABLE IF EXISTS Productos');
+        await sequelize.query('DROP TABLE IF EXISTS productos'); 
         await sequelize.query('DROP TABLE IF EXISTS Usuarios');
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
         
-        console.log('📡 [LIMPIEZA]: Tablas eliminadas por bypass de seguridad.');
+        console.log('📡 [LIMPIEZA]: Tablas eliminadas (Bypass de FK activo).');
 
         // 2. SINCRONIZAR DE CERO
         await sequelize.sync({ force: true });
@@ -117,10 +118,8 @@ const startServer = async () => {
 
     } catch (err) {
         console.error('❌ [CRITICAL ERROR]:', err.message);
-        process.exit(1); // Cerramos si hay error crítico
+        process.exit(1);
     }
 };
 
 startServer();
-
-// Forzando deploy final - Clean Slate Protocol
