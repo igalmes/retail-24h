@@ -88,7 +88,7 @@ app.get('*', (req, res) => {
 
 // --- ARRANQUE Y SINCRONIZACIÓN ---
 // Cambiamos a alter: true una sola vez si seguís teniendo el error de columna nombre
-sequelize.sync({ alter: true }) 
+sequelize.sync({ force: true }) 
     .then(() => {
         console.log('📡 [SYSTEM]: Conexión con base de datos Aiven establecida.');
         inicializarAdmin().then(() => {
