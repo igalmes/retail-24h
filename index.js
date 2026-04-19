@@ -42,25 +42,40 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión establecida. Iniciando sincronización limpia...');
+        console.log('📡 Conexión con Aiven establecida.');
 
-        // Sincronización en orden de jerarquía
-        await Usuario.sync({ force: true });
-        await Producto.sync({ force: true });
-        await Pedido.sync({ force: true });
-        await PedidoItem.sync({ force: true });
+        // --- EL FIX DEFINITIVO ---
+        // Ejecutamos SQL puro para romper todo antes de que Sequelize se trabe
+        console.log('🧹 Ejecutando limpieza nuclear...');
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
         
-        console.log('🏗️ Estructura recreada con éxito.');
+        // Borramos absolutamente todas las variaciones de nombres que hubo
+        const tablasABorrar = ['PedidoItems', 'pedidoitems', 'Pedidos', 'pedidos', 'productos', 'Productos', 'Usuarios', 'usuarios', 'SequelizeMeta'];
+        for (const tabla of tablasABorrar) {
+            await sequelize.query(`DROP TABLE IF EXISTS ${tabla}`);
+        }
+        
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        console.log('✨ DB reseteada a cero.');
 
-        await Usuario.findOrCreate({
-            where: { email: 'ignaciogalmes79@gmail.com' },
-            defaults: { nombre: 'Ignacio Galmes', password: 'password_provisoria_123', rol: 'admin' }
-        });
+        // --- RECONSTRUCCIÓN PASO A PASO ---
+        // Ya no usamos force: true aquí porque ya borramos todo arriba con SQL puro
+        await Usuario.sync();
+        console.log('✅ Usuarios OK');
+        
+        await Producto.sync();
+        await Pedido.sync();
+        console.log('✅ Productos y Pedidos OK');
+        
+        await PedidoItem.sync();
+        console.log('✅ PedidoItems OK');
+
+        // Inicializar Admin
+        await inicializarAdmin();
         
         app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 [READY]: Retail 24h AI operativo.`);
-            // El bot se inicializa en segundo plano para no demorar el deploy
-            whatsappBot.initialize(1).catch(e => console.log("Bot cargando..."));
+            console.log(`🚀 [READY]: Servidor corriendo en puerto ${PORT}`);
+            whatsappBot.initialize(1).catch(err => console.error("Error Bot:", err.message));
         });
 
     } catch (err) {
@@ -68,5 +83,4 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
 startServer();
