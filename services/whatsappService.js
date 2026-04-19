@@ -6,10 +6,9 @@ const geminiService = require('./geminiService');
 const sessions = {};
 
 const initialize = async (userId = 1) => {
-    if (sessions[userId]) {
-        console.log(`ℹ️ [BOT]: Sesión para usuario ${userId} ya está activa.`);
-        return sessions[userId];
-    }
+    if (sessions[userId]) return sessions[userId];
+
+    console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
 
     const client = new Client({
         authStrategy: new LocalAuth({
@@ -17,7 +16,8 @@ const initialize = async (userId = 1) => {
         }),
         puppeteer: {
             headless: true,
-            // BORRAMOS executablePath para que use el por defecto de puppeteer
+            // Ruta estable en Render para Chrome
+            executablePath: '/usr/bin/google-chrome-stable', 
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -29,10 +29,8 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('qr', (qr) => {
-        console.log(`\n-------------------------------------------------------`);
         console.log(`✅ [BOT]: QR GENERADO PARA USUARIO ${userId}`);
         qrcode.generate(qr, { small: true });
-        console.log(`-------------------------------------------------------\n`);
     });
 
     client.on('ready', () => {
@@ -50,9 +48,7 @@ const initialize = async (userId = 1) => {
 
         if (!esComandoAdmin && !tieneTriggerIA) return;
 
-        if (textoLower === 'ping') {
-            return msg.reply('pong! 🏓');
-        }
+        if (textoLower === 'ping') return msg.reply('pong! 🏓');
 
         if (textoLower.startsWith('stock ')) {
             const ean = textoLower.split(' ')[1];
@@ -63,7 +59,6 @@ const initialize = async (userId = 1) => {
                 if (!producto) return msg.reply("❌ Producto no encontrado.");
                 return msg.reply(`📦 *${producto.nombre}*\n📉 Stock: ${producto.stock_actual}\n💰 Precio: $${producto.precio_sugerido}`);
             } catch (e) {
-                console.error("Error stock:", e.message);
                 return msg.reply("❌ Error al consultar base de datos.");
             }
         }
