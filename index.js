@@ -16,10 +16,13 @@ const PedidoItem = require('./models/PedidoItem');
 // --- ASOCIACIONES ---
 Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
 Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_prod_user_retail' });
+
 Usuario.hasMany(Pedido, { foreignKey: 'UsuarioId' });
 Pedido.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_ped_user_retail' });
+
 Pedido.hasMany(PedidoItem, { foreignKey: 'PedidoId', onDelete: 'CASCADE' });
 PedidoItem.belongsTo(Pedido, { foreignKey: 'PedidoId', foreignKeyConstraintName: 'fk_item_ped_retail' });
+
 Producto.hasMany(PedidoItem, { foreignKey: 'ProductoId', onDelete: 'CASCADE' });
 PedidoItem.belongsTo(Producto, { foreignKey: 'ProductoId', foreignKeyConstraintName: 'fk_item_prod_retail' });
 
@@ -75,13 +78,17 @@ const startServer = async () => {
 
         await ejecutarInicializacionAdmin();
         
+        // ESCUCHA DEL SERVIDOR
         app.listen(PORT, '0.0.0.0', async () => {
             console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
             
+            // BLINDAJE: Si el bot falla, el servidor sigue vivo
             try {
+                console.log("⏳ [BOT]: Iniciando instancia para usuario 1...");
                 await whatsappBot.initialize(1);
             } catch (err) {
-                console.error("⚠️ [BOT ERROR]: No se pudo iniciar el bot, pero la web está activa:", err.message);
+                console.error("⚠️ [BOT ERROR]: No se pudo iniciar el bot, pero la web está activa.");
+                console.error("Detalle del error:", err.message);
             }
         });
 
