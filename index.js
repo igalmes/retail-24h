@@ -13,7 +13,7 @@ const Producto = require('./models/Producto');
 const Pedido = require('./models/Pedido');
 const PedidoItem = require('./models/PedidoItem');
 
-// --- ASOCIACIONES CON NOMBRES ÚNICOS (Blindaje anti-Aiven) ---
+// --- ASOCIACIONES ---
 Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
 Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_prod_user_retail' });
 
@@ -32,6 +32,24 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'] }));
 app.use(express.json());
 
+// --- FUNCIÓN ADMIN (Asegurate que esté declarada) ---
+const ejecutarInicializacionAdmin = async () => {
+    try {
+        const [admin, created] = await Usuario.findOrCreate({
+            where: { email: 'ignaciogalmes79@gmail.com' },
+            defaults: { 
+                nombre: 'Ignacio Galmes',
+                password: 'password_provisoria_123',
+                rol: 'admin'
+            }
+        });
+        console.log(created ? "✅ [SISTEMA]: Admin creado." : "ℹ️ [SISTEMA]: Admin ya existente.");
+    } catch (error) {
+        console.error("❌ [ERROR ADMIN]:", error.message);
+    }
+};
+
+// --- RUTAS ---
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes'));
@@ -39,43 +57,30 @@ app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// --- ARRANQUE ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
         console.log('📡 Conexión con Aiven establecida.');
 
-        // --- EL FIX DEFINITIVO ---
-        // Ejecutamos SQL puro para romper todo antes de que Sequelize se trabe
         console.log('🧹 Ejecutando limpieza nuclear...');
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-        
-        // Borramos absolutamente todas las variaciones de nombres que hubo
-        const tablasABorrar = ['PedidoItems', 'pedidoitems', 'Pedidos', 'pedidos', 'productos', 'Productos', 'Usuarios', 'usuarios', 'SequelizeMeta'];
-        for (const tabla of tablasABorrar) {
-            await sequelize.query(`DROP TABLE IF EXISTS ${tabla}`);
-        }
-        
+        const tablas = ['PedidoItems', 'pedidoitems', 'Pedidos', 'pedidos', 'productos', 'Productos', 'Usuarios', 'usuarios', 'SequelizeMeta'];
+        for (const t of tablas) { await sequelize.query(`DROP TABLE IF EXISTS ${t}`); }
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
         console.log('✨ DB reseteada a cero.');
 
-        // --- RECONSTRUCCIÓN PASO A PASO ---
-        // Ya no usamos force: true aquí porque ya borramos todo arriba con SQL puro
         await Usuario.sync();
-        console.log('✅ Usuarios OK');
-        
         await Producto.sync();
         await Pedido.sync();
-        console.log('✅ Productos y Pedidos OK');
-        
         await PedidoItem.sync();
-        console.log('✅ PedidoItems OK');
+        console.log('🏗️  Estructura recreada.');
 
-        // Inicializar Admin
-        await inicializarAdmin();
+        await ejecutarInicializacionAdmin();
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 [READY]: Servidor corriendo en puerto ${PORT}`);
-            whatsappBot.initialize(1).catch(err => console.error("Error Bot:", err.message));
+            whatsappBot.initialize(1).catch(e => {});
         });
 
     } catch (err) {
@@ -83,4 +88,5 @@ const startServer = async () => {
         process.exit(1);
     }
 };
+
 startServer();
