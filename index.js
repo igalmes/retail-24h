@@ -16,10 +16,13 @@ const PedidoItem = require('./models/PedidoItem');
 // --- ASOCIACIONES ---
 Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
 Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_prod_user_retail' });
+
 Usuario.hasMany(Pedido, { foreignKey: 'UsuarioId' });
 Pedido.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_ped_user_retail' });
+
 Pedido.hasMany(PedidoItem, { foreignKey: 'PedidoId', onDelete: 'CASCADE' });
 PedidoItem.belongsTo(Pedido, { foreignKey: 'PedidoId', foreignKeyConstraintName: 'fk_item_ped_retail' });
+
 Producto.hasMany(PedidoItem, { foreignKey: 'ProductoId', onDelete: 'CASCADE' });
 PedidoItem.belongsTo(Producto, { foreignKey: 'ProductoId', foreignKeyConstraintName: 'fk_item_prod_retail' });
 
@@ -32,7 +35,7 @@ app.use(express.json());
 // --- FUNCIÓN ADMIN ---
 const ejecutarInicializacionAdmin = async () => {
     try {
-        await Usuario.findOrCreate({
+        const [admin, created] = await Usuario.findOrCreate({
             where: { email: 'ignaciogalmes79@gmail.com' },
             defaults: { 
                 nombre: 'Ignacio Galmes',
@@ -40,7 +43,7 @@ const ejecutarInicializacionAdmin = async () => {
                 rol: 'admin'
             }
         });
-        console.log("ℹ️ [SISTEMA]: Admin verificado.");
+        console.log(created ? "✅ [SISTEMA]: Admin creado." : "ℹ️ [SISTEMA]: Admin ya existente.");
     } catch (error) {
         console.error("❌ [ERROR ADMIN]:", error.message);
     }
@@ -51,9 +54,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes'));
 
-// --- ARCHIVOS ESTÁTICOS (IMPORTANTE: client/dist) ---
-app.use(express.static(path.join(__dirname, 'client/dist')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'client/dist', 'index.html')));
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- ARRANQUE ---
 const startServer = async () => {
@@ -61,7 +63,16 @@ const startServer = async () => {
         await sequelize.authenticate();
         console.log('📡 Conexión con Aiven establecida.');
 
-        await Usuario.sync(); 
+        // COMENTÁ ESTO PARA NO PERDER DATOS:
+        /*
+        console.log('🧹 Ejecutando limpieza nuclear...');
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+        const tablas = ['PedidoItems', 'pedidoitems', 'Pedidos', 'pedidos', 'productos', 'Productos', 'Usuarios', 'usuarios', 'SequelizeMeta'];
+        for (const t of tablas) { await sequelize.query(`DROP TABLE IF EXISTS ${t}`); }
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        */
+
+        await Usuario.sync(); // Esto crea las tablas si NO existen, pero NO borra datos
         await Producto.sync();
         await Pedido.sync();
         await PedidoItem.sync();
