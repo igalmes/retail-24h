@@ -78,15 +78,16 @@ const startServer = async () => {
 
         await ejecutarInicializacionAdmin();
         
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 [READY]: Servidor corriendo en puerto ${PORT}`);
-            whatsappBot.initialize(1).catch(e => {});
-        });
-
+        // En tu index.js, dentro de startServer:
+app.listen(PORT, '0.0.0.0', async () => {
+    console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
+    
+    // Lo envolvemos para que un error de Chrome no mate tu API
+    try {
+        await whatsappBot.initialize(1);
     } catch (err) {
-        console.error('❌ [CRITICAL ERROR]:', err.message);
-        process.exit(1);
+        console.error("⚠️ [BOT ERROR]: No se pudo iniciar el bot, pero la web está activa:", err.message);
     }
-};
+});
 
 startServer();

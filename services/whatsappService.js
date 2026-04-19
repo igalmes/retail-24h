@@ -19,13 +19,25 @@ const initialize = async (userId = 1) => { // Por defecto 1 para tu admin
     console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
 
     const client = new Client({
-        authStrategy: new LocalAuth({
-            clientId: `user-session-${userId}` // Crea carpetas separadas por usuario
-        }),
-        puppeteer: {
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage','--disable-extensions','--single-process','--no-zygote'],
-        }
-    });
+    authStrategy: new LocalAuth({
+        clientId: `user-session-${userId}`
+    }),
+    puppeteer: {
+        // RUTA CLAVE PARA RENDER
+        executablePath: '/opt/render/.cache/puppeteer/chrome/linux-147.0.7727.56/chrome-linux64/chrome',
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-extensions',
+            '--single-process',
+            '--no-zygote',
+            '--no-first-run',
+            '--disable-gpu'
+        ],
+    }
+});
 
     client.on('qr', (qr) => {
         // En el futuro, esto se enviará al frontend via Socket.io
