@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCodeImage = require('qrcode'); // Necesitás instalarlo: npm install qrcode
 const path = require('path');
 const fs = require('fs');
 const Producto = require('../models/Producto');
@@ -12,8 +13,6 @@ const initialize = async (userId = 1) => {
 
     console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
 
-    // Construimos la ruta absoluta hacia el Chrome instalado en el build de Render
-    // La versión 147.0.7727.56 es la que figura en tus logs actuales
     const chromePath = path.join(
         process.cwd(), 
         '.puppeteer_cache', 
@@ -23,15 +22,12 @@ const initialize = async (userId = 1) => {
         'chrome'
     );
 
-    console.log(`🔍 [DEBUG-PATH]: Verificando existencia de Chrome en: ${chromePath}`);
-
     const client = new Client({
         authStrategy: new LocalAuth({
             clientId: `user-session-${userId}`
         }),
         puppeteer: {
             headless: true,
-            // Si el archivo existe en esa ruta, lo usamos. Si no, dejamos que Puppeteer busque solo.
             executablePath: fs.existsSync(chromePath) ? chromePath : undefined,
             args: [
                 '--no-sandbox',
@@ -43,34 +39,37 @@ const initialize = async (userId = 1) => {
         }
     });
 
-    client.on('qr', (qr) => {
+    client.on('qr', async (qr) => {
         console.log(`✅ [BOT]: QR GENERADO PARA USUARIO ${userId}`);
-        qrcode.generate(qr, { small: true });
+        
+        // 1. Seguimos mostrándolo en consola por las dudas
+        qrcodeTerminal.generate(qr, { small: true });
+
+        // 2. Generamos la imagen para la ruta web /qr
+        try {
+            global.ultimoQR = await QRCodeImage.toDataURL(qr);
+        } catch (err) {
+            console.error("Error generando QR imagen:", err);
+        }
     });
 
     client.on('ready', () => {
         console.log(`🚀 [BOT]: WhatsApp de Usuario ${userId} conectado.`);
+        global.ultimoQR = null; // Limpiamos el QR cuando ya conectó
     });
 
     client.on('message_create', async (msg) => {
-        // Ignorar mensajes que no sean de contactos individuales
         if (!msg.from.endsWith('@c.us')) return;
 
         const textoOriginal = msg.body.trim();
         const textoLower = textoOriginal.toLowerCase();
 
-        // Comando simple de prueba
         if (textoLower === 'ping') return msg.reply('pong! 🏓');
 
-        // Lógica de activación de IA
         const tieneTriggerIA = textoLower.startsWith('bot');
-        
-        // Respondemos si empieza con "bot" (ya sea mensaje entrante o nuestro si escribimos "bot")
         if (tieneTriggerIA && (!msg.fromMe || textoLower.startsWith('bot'))) {
             try {
                 const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
-                
-                // Si el mensaje está vacío después del "bot", no hacemos nada
                 if (!consultaIA) return;
 
                 const respuestaIA = await geminiService.procesarChatBot(consultaIA);
@@ -81,7 +80,6 @@ const initialize = async (userId = 1) => {
         }
     });
 
-    // Manejo de errores de inicialización para que no rompa el servidor principal
     try {
         await client.initialize();
         sessions[userId] = client;
