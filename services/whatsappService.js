@@ -1,5 +1,7 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const path = require('path');
+const fs = require('fs');
 const Producto = require('../models/Producto');
 const geminiService = require('./geminiService');
 
@@ -10,14 +12,16 @@ const initialize = async (userId = 1) => {
 
     console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
 
+    // Definimos la ruta de caché que coincida con el comando de Build
+    const chromePath = path.join(process.cwd(), '.puppeteer_cache', 'chrome', 'linux-147.0.7727.56', 'chrome-linux64', 'chrome');
+
     const client = new Client({
         authStrategy: new LocalAuth({
             clientId: `user-session-${userId}`
         }),
         puppeteer: {
             headless: true,
-            // Ruta estable en Render para Chrome
-            executablePath: '/usr/bin/google-chrome-stable', 
+            executablePath: fs.existsSync(chromePath) ? chromePath : undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',

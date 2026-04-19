@@ -32,7 +32,6 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'] }));
 app.use(express.json());
 
-// --- FUNCIÓN ADMIN ---
 const ejecutarInicializacionAdmin = async () => {
     try {
         const [admin, created] = await Usuario.findOrCreate({
@@ -54,8 +53,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes'));
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Servir frontend desde client/dist
+app.use(express.static(path.join(__dirname, 'client/dist')));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
+});
 
 // --- ARRANQUE ---
 const startServer = async () => {
@@ -63,16 +65,7 @@ const startServer = async () => {
         await sequelize.authenticate();
         console.log('📡 Conexión con Aiven establecida.');
 
-        // COMENTÁ ESTO PARA NO PERDER DATOS:
-        /*
-        console.log('🧹 Ejecutando limpieza nuclear...');
-        await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-        const tablas = ['PedidoItems', 'pedidoitems', 'Pedidos', 'pedidos', 'productos', 'Productos', 'Usuarios', 'usuarios', 'SequelizeMeta'];
-        for (const t of tablas) { await sequelize.query(`DROP TABLE IF EXISTS ${t}`); }
-        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
-        */
-
-        await Usuario.sync(); // Esto crea las tablas si NO existen, pero NO borra datos
+        await Usuario.sync(); 
         await Producto.sync();
         await Pedido.sync();
         await PedidoItem.sync();
@@ -82,7 +75,10 @@ const startServer = async () => {
         app.listen(PORT, '0.0.0.0', async () => {
             console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
             try {
-                await whatsappBot.initialize(1);
+                // Pequeño delay para que el servidor respire antes de Puppeteer
+                setTimeout(async () => {
+                    await whatsappBot.initialize(1);
+                }, 5000);
             } catch (err) {
                 console.error("⚠️ [BOT ERROR]:", err.message);
             }
