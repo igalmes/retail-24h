@@ -13,7 +13,7 @@ const Producto = require('./models/Producto');
 const Pedido = require('./models/Pedido');
 const PedidoItem = require('./models/PedidoItem');
 
-// --- ASOCIACIONES CON NOMBRES ÚNICOS (Blindaje contra errores de Aiven) ---
+// --- ASOCIACIONES CON NOMBRES ÚNICOS (Blindaje anti-Aiven) ---
 Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
 Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_prod_user_retail' });
 
@@ -42,17 +42,16 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión establecida. Limpiando para reconstrucción...');
+        console.log('📡 Conexión establecida. Iniciando sincronización limpia...');
 
-        // Forzamos el orden de creación
+        // Sincronización en orden de jerarquía
         await Usuario.sync({ force: true });
         await Producto.sync({ force: true });
         await Pedido.sync({ force: true });
         await PedidoItem.sync({ force: true });
         
-        console.log('🏗️  Estructura recreada con éxito.');
+        console.log('🏗️ Estructura recreada con éxito.');
 
-        // Crear Admin
         await Usuario.findOrCreate({
             where: { email: 'ignaciogalmes79@gmail.com' },
             defaults: { nombre: 'Ignacio Galmes', password: 'password_provisoria_123', rol: 'admin' }
@@ -60,6 +59,7 @@ const startServer = async () => {
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 [READY]: Retail 24h AI operativo.`);
+            // El bot se inicializa en segundo plano para no demorar el deploy
             whatsappBot.initialize(1).catch(e => console.log("Bot cargando..."));
         });
 
