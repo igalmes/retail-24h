@@ -1,92 +1,60 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const cors = require('cors');
 const sequelize = require('./config/db'); 
 const whatsappBot = require('./services/whatsappService');
 const authRoutes = require('./routes/authRoutes');
 const verifyToken = require('./middleware/auth');
 
-// --- MODELOS ---
-const Usuario = require('./models/Usuario');
-const Producto = require('./models/Producto');
-const Pedido = require('./models/Pedido');
-const PedidoItem = require('./models/PedidoItem');
-
-// --- ASOCIACIONES ---
-Usuario.hasMany(Producto, { foreignKey: 'UsuarioId' });
-Producto.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_prod_user_retail' });
-
-Usuario.hasMany(Pedido, { foreignKey: 'UsuarioId' });
-Pedido.belongsTo(Usuario, { foreignKey: 'UsuarioId', foreignKeyConstraintName: 'fk_ped_user_retail' });
-
-Pedido.hasMany(PedidoItem, { foreignKey: 'PedidoId', onDelete: 'CASCADE' });
-PedidoItem.belongsTo(Pedido, { foreignKey: 'PedidoId', foreignKeyConstraintName: 'fk_item_ped_retail' });
-
-Producto.hasMany(PedidoItem, { foreignKey: 'ProductoId', onDelete: 'CASCADE' });
-PedidoItem.belongsTo(Producto, { foreignKey: 'ProductoId', foreignKeyConstraintName: 'fk_item_prod_retail' });
-
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 10000;
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'] }));
+app.use(cors());
 app.use(express.json());
 
-const ejecutarInicializacionAdmin = async () => {
-    try {
-        const [admin, created] = await Usuario.findOrCreate({
-            where: { email: 'ignaciogalmes79@gmail.com' },
-            defaults: { 
-                nombre: 'Ignacio Galmes',
-                password: 'password_provisoria_123',
-                rol: 'admin'
-            }
-        });
-        console.log(created ? "✅ [SISTEMA]: Admin creado." : "ℹ️ [SISTEMA]: Admin ya existente.");
-    } catch (error) {
-        console.error("❌ [ERROR ADMIN]:", error.message);
-    }
-};
-
-// --- RUTAS ---
+// --- RUTAS API ---
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes'));
 
-// Servir frontend desde client/dist
-app.use(express.static(path.join(__dirname, 'client/dist')));
+// --- FRONTEND ---
+const distPath = path.resolve(__dirname, 'client', 'dist');
+app.use(express.static(distPath));
+
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(200).send("API Online. El frontend aún no está listo en: " + distPath);
+    }
 });
 
 // --- ARRANQUE ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión con Aiven establecida.');
+        console.log('📡 Conexión con DB OK.');
 
+        // Sincronización segura (no borra datos)
+        const Usuario = require('./models/Usuario');
         await Usuario.sync(); 
-        await Producto.sync();
-        await Pedido.sync();
-        await PedidoItem.sync();
         
-        await ejecutarInicializacionAdmin();
-        
-        app.listen(PORT, '0.0.0.0', async () => {
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
-            try {
-                // Pequeño delay para que el servidor respire antes de Puppeteer
-                setTimeout(async () => {
-                    await whatsappBot.initialize(1);
-                }, 5000);
-            } catch (err) {
-                console.error("⚠️ [BOT ERROR]:", err.message);
-            }
+            // Iniciamos el bot con un delay para asegurar que el sistema está estable
+            setTimeout(() => {
+                whatsappBot.initialize(1).catch(err => {
+                    console.error("⚠️ [BOT ERROR]:", err.message);
+                });
+            }, 5000);
         });
-
     } catch (err) {
         console.error('❌ [CRITICAL ERROR]:', err.message);
         process.exit(1);
     }
 };
+
 startServer();

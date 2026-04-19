@@ -1,7 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const path = require('path');
-const fs = require('fs');
 const Producto = require('../models/Producto');
 const geminiService = require('./geminiService');
 
@@ -12,16 +10,13 @@ const initialize = async (userId = 1) => {
 
     console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
 
-    // Definimos la ruta de caché que coincida con el comando de Build
-    const chromePath = path.join(process.cwd(), '.puppeteer_cache', 'chrome', 'linux-147.0.7727.56', 'chrome-linux64', 'chrome');
-
     const client = new Client({
         authStrategy: new LocalAuth({
             clientId: `user-session-${userId}`
         }),
         puppeteer: {
             headless: true,
-            executablePath: fs.existsSync(chromePath) ? chromePath : undefined,
+            // IMPORTANTE: Dejamos que la variable de entorno PUPPETEER_CACHE_DIR maneje la ruta
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -38,52 +33,25 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('ready', () => {
-        console.log(`🚀 [BOT]: WhatsApp de Usuario ${userId} conectado y operando.`);
+        console.log(`🚀 [BOT]: WhatsApp de Usuario ${userId} conectado.`);
     });
 
     client.on('message_create', async (msg) => {
+        if (!msg.from.endsWith('@c.us')) return;
         const textoOriginal = msg.body.trim();
         const textoLower = textoOriginal.toLowerCase();
 
-        if (!msg.from.endsWith('@c.us')) return;
-
-        const esComandoAdmin = textoLower === 'ping' || textoLower.startsWith('stock ');
-        const tieneTriggerIA = textoLower.startsWith('bot');
-
-        if (!esComandoAdmin && !tieneTriggerIA) return;
-
         if (textoLower === 'ping') return msg.reply('pong! 🏓');
 
-        if (textoLower.startsWith('stock ')) {
-            const ean = textoLower.split(' ')[1];
-            try {
-                const producto = await Producto.findOne({ 
-                    where: { codigo_barras: ean, UsuarioId: userId } 
-                });
-                if (!producto) return msg.reply("❌ Producto no encontrado.");
-                return msg.reply(`📦 *${producto.nombre}*\n📉 Stock: ${producto.stock_actual}\n💰 Precio: $${producto.precio_sugerido}`);
-            } catch (e) {
-                return msg.reply("❌ Error al consultar base de datos.");
-            }
-        }
-
+        // Lógica de IA/Comandos
+        const tieneTriggerIA = textoLower.startsWith('bot');
         if (tieneTriggerIA && (!msg.fromMe || textoLower.startsWith('bot'))) {
             try {
                 const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
                 const respuestaIA = await geminiService.procesarChatBot(consultaIA);
-
-                if (respuestaIA.esPedido && respuestaIA.items.length > 0) {
-                    let res = `🛒 *Pedido en Comercio:* \n\n`;
-                    respuestaIA.items.forEach(p => {
-                        res += `- ${p.cantidad}x ${p.producto}\n`;
-                    });
-                    res += `\n¿Es correcto? (Responde *SÍ* para confirmar)`;
-                    await msg.reply(res);
-                } else {
-                    await msg.reply(respuestaIA.mensaje);
-                }
+                await msg.reply(respuestaIA.mensaje);
             } catch (error) {
-                console.error("❌ Error Capa IA:", error.message);
+                console.error("❌ IA Error:", error.message);
             }
         }
     });
