@@ -63,32 +63,28 @@ const startServer = async () => {
         await sequelize.authenticate();
         console.log('📡 Conexión con Aiven establecida.');
 
+        // COMENTÁ ESTO PARA NO PERDER DATOS:
+        /*
         console.log('🧹 Ejecutando limpieza nuclear...');
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
         const tablas = ['PedidoItems', 'pedidoitems', 'Pedidos', 'pedidos', 'productos', 'Productos', 'Usuarios', 'usuarios', 'SequelizeMeta'];
         for (const t of tablas) { await sequelize.query(`DROP TABLE IF EXISTS ${t}`); }
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
-        console.log('✨ DB reseteada a cero.');
+        */
 
-        await Usuario.sync();
+        await Usuario.sync(); // Esto crea las tablas si NO existen, pero NO borra datos
         await Producto.sync();
         await Pedido.sync();
         await PedidoItem.sync();
-        console.log('🏗️ Estructura recreada.');
-
+        
         await ejecutarInicializacionAdmin();
         
-        // ESCUCHA DEL SERVIDOR
         app.listen(PORT, '0.0.0.0', async () => {
             console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
-            
-            // BLINDAJE: Si el bot falla, el servidor sigue vivo
             try {
-                console.log("⏳ [BOT]: Iniciando instancia para usuario 1...");
                 await whatsappBot.initialize(1);
             } catch (err) {
-                console.error("⚠️ [BOT ERROR]: No se pudo iniciar el bot, pero la web está activa.");
-                console.error("Detalle del error:", err.message);
+                console.error("⚠️ [BOT ERROR]:", err.message);
             }
         });
 
@@ -97,5 +93,4 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
 startServer();

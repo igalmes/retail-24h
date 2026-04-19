@@ -16,18 +16,14 @@ const initialize = async (userId = 1) => {
             clientId: `user-session-${userId}`
         }),
         puppeteer: {
-            // Intentamos la ruta que Render nos dio en el log
-            executablePath: '/opt/render/.cache/puppeteer/chrome/linux-147.0.7727.56/chrome-linux64/chrome',
             headless: true,
+            // BORRAMOS executablePath para que use el por defecto de puppeteer
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-extensions',
                 '--single-process',
-                '--no-zygote',
-                '--no-first-run',
-                '--disable-gpu'
+                '--no-zygote'
             ],
         }
     });
