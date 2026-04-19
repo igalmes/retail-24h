@@ -32,7 +32,7 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'] }));
 app.use(express.json());
 
-// --- FUNCIÓN ADMIN (Asegurate que esté declarada) ---
+// --- FUNCIÓN ADMIN ---
 const ejecutarInicializacionAdmin = async () => {
     try {
         const [admin, created] = await Usuario.findOrCreate({
@@ -74,20 +74,25 @@ const startServer = async () => {
         await Producto.sync();
         await Pedido.sync();
         await PedidoItem.sync();
-        console.log('🏗️  Estructura recreada.');
+        console.log('🏗️ Estructura recreada.');
 
         await ejecutarInicializacionAdmin();
         
-        // En tu index.js, dentro de startServer:
-app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
-    
-    // Lo envolvemos para que un error de Chrome no mate tu API
-    try {
-        await whatsappBot.initialize(1);
+        app.listen(PORT, '0.0.0.0', async () => {
+            console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
+            
+            // BLINDAJE: Si falla el Chrome del bot, la API sigue viva
+            try {
+                await whatsappBot.initialize(1);
+            } catch (err) {
+                console.error("⚠️ [BOT ERROR]: No se pudo iniciar el bot:", err.message);
+            }
+        });
+
     } catch (err) {
-        console.error("⚠️ [BOT ERROR]: No se pudo iniciar el bot, pero la web está activa:", err.message);
+        console.error('❌ [CRITICAL ERROR en startServer]:', err.message);
+        process.exit(1);
     }
-});
+};
 
 startServer();
