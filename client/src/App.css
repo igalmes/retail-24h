@@ -1,99 +1,137 @@
-/* Layout Principal */
+/* Layout Principal - Cambio a Flex para mejor control móvil */
 .admin-layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  height: 100vh;
+  display: flex;
+  flex-direction: row; /* Desktop por defecto */
+  min-height: 100vh;
   background-color: #f8fafc;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* Barra Lateral */
+/* Sidebar Responsive */
 .sidebar {
+  width: 280px;
   background-color: #1a202c;
   color: white;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  box-shadow: 4px 0 10px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  transition: all 0.3s ease;
+  z-index: 100;
 }
 
-.sidebar-brand {
-  padding: 25px;
-  font-size: 1.5rem;
-  font-weight: 800;
-  border-bottom: 1px solid #2d3748;
-  letter-spacing: -0.5px;
+/* --- RESPONSIVE: MÓVILES (Celulares) --- */
+@media (max-width: 768px) {
+  .admin-layout {
+    flex-direction: column; /* Apilamos Sidebar y Contenido */
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+
+  .sidebar-brand {
+    padding: 15px;
+    text-align: center;
+    font-size: 1.2rem;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    overflow-x: auto; /* Menú horizontal en móviles */
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .nav-item {
+    margin-bottom: 0;
+    white-space: nowrap;
+    padding: 8px 15px;
+    font-size: 0.9rem;
+  }
+
+  /* El resumen de venta (carrito) lo hacemos flotante o compacto */
+  .cart-card {
+    margin: 10px !important;
+    font-size: 0.85rem;
+  }
+
+  /* OCULTAR TABLA Y MOSTRAR CARDS */
+  .table-responsive {
+    display: none; /* Escondemos la tabla tradicional */
+  }
+
+  /* Creamos un diseño de lista de cards para móvil */
+  .content-grid-mobile {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 15px;
+  }
 }
 
-.sidebar-nav {
-  padding: 20px;
-  flex-grow: 1;
+/* --- DISEÑO DE PRODUCTOS EN MÓVIL --- */
+.product-card-mobile {
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.nav-item {
-  padding: 12px 20px;
-  cursor: pointer;
+.product-card-mobile img {
+  width: 60px;
+  height: 60px;
   border-radius: 8px;
-  margin-bottom: 8px;
-  transition: all 0.2s;
-  color: #a0aec0;
+  object-fit: cover;
 }
 
-.nav-item:hover {
-  background-color: #2d3748;
-  color: white;
-}
-
-.nav-item.active {
-  background-color: #3182ce;
-  color: white;
-  font-weight: bold;
-}
-
-/* Contenido y Header */
-.content {
-  overflow-y: auto;
-}
-
+/* Header Adaptable */
 .content-header {
   background: white;
-  padding: 20px 40px;
+  padding: 15px 20px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column; /* En móvil, título arriba, user abajo */
+  gap: 10px;
   border-bottom: 1px solid #e2e8f0;
 }
 
-/* Botones "Soft" Modernos */
-.btn-soft-primary { background: #dbeafe; color: #1d4ed8; border: none; font-weight: 600; }
-.btn-soft-primary:hover { background: #bfdbfe; }
-
-.btn-soft-success { background: #dcfce7; color: #15803d; border: none; font-weight: 600; }
-.btn-soft-success:hover { background: #bbf7d0; }
-
-.btn-soft-danger { background: #fee2e2; color: #b91c1c; border: none; }
-.btn-soft-danger:hover { background: #fecaca; }
-
-/* Modales */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+@media (min-width: 769px) {
+  .content-header {
+    flex-direction: row;
+    padding: 20px 40px;
+  }
 }
 
-.modal-content-card {
-  background: white;
-  padding: 30px;
-  border-radius: 16px;
-  width: 450px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+/* Botón de Escaneo Flotante para Móvil */
+@media (max-width: 768px) {
+  .btn-scan {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50% !important;
+    font-size: 0; /* Escondemos el texto */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 20px rgba(21, 128, 61, 0.4);
+    z-index: 999;
+  }
+  
+  .btn-scan::after {
+    content: '📸';
+    font-size: 24px;
+  }
 }
 
-/* Utilidades */
-.cursor-pointer { cursor: pointer; }
+/* Estilos de tabla para Tablets (Punto medio) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar { width: 200px; }
+  .sidebar-brand { font-size: 1.1rem; }
+}
