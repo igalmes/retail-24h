@@ -75,21 +75,40 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/status', (req, res) => res.status(200).json({ status: "online", project: "Retail 24h AI" }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// --- ARRANQUE ATÓMICO ---
+// --- ARRANQUE ATÓMICO REPARADO ---
 const startServer = async () => {
     try {
-        // 1. Conexión
         await sequelize.authenticate();
         console.log('📡 Conexión con Aiven establecida.');
 
-        // 2. Sincronización Secuencial (Respetando el orden de dependencia)
-        // Ejecutamos en este orden para que las tablas padres existan antes que las hijas
+        // 1. DESACTIVAR CHECKS Y BORRAR EN ORDEN INVERSO
+        // Esto rompe el bloqueo de "Cannot drop table Usuarios"
+        console.log('🧹 Limpiando residuos de deploys anteriores...');
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+        
+        // Borramos primero las tablas que tienen FKs (las hijas)
+        await sequelize.query('DROP TABLE IF EXISTS PedidoItems');
+        await sequelize.query('DROP TABLE IF EXISTS Pedidos');
+        await sequelize.query('DROP TABLE IF EXISTS productos'); // Tu modelo usa tableName: 'productos'
+        await sequelize.query('DROP TABLE IF EXISTS Productos'); 
+        await sequelize.query('DROP TABLE IF EXISTS Usuarios');
+        
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        console.log('✨ DB lista para reconstrucción.');
+
+        // 2. SINCRONIZACIÓN SECUENCIAL (Orden de jerarquía)
+        // Primero el dueño de todo
         await Usuario.sync({ force: true });
+        console.log('✅ Tabla Usuarios creada.');
+
+        // Luego los que dependen de Usuario
         await Producto.sync({ force: true });
         await Pedido.sync({ force: true });
+        console.log('✅ Tablas Productos y Pedidos creadas.');
+
+        // Al final el detalle que depende de Producto y Pedido
         await PedidoItem.sync({ force: true });
-        
-        console.log('🏗️ Estructura de Base de Datos recreada con éxito.');
+        console.log('✅ Tabla PedidoItems creada.');
 
         // 3. Datos iniciales
         await inicializarAdmin();
@@ -109,5 +128,4 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
 startServer();
