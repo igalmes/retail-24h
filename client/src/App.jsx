@@ -7,7 +7,7 @@ const API_URL = window.location.hostname === 'localhost'
     : 'https://retail-24h.onrender.com/api';
 
 // REEMPLAZAR con tu Client ID de Google Cloud Console
-const GOOGLE_CLIENT_ID = "tu_id_aqui.apps.googleusercontent.com"; 
+const GOOGLE_CLIENT_ID = "264704665731-hi7jv7mvdnrud4cfoumuth3sok12mdb3.apps.googleusercontent.com"; 
 
 function App() {
   const [user, setUser] = useState(null);
