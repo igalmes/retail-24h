@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productoController = require('../controllers/productoController');
+const authMiddleware = require('../middleware/auth'); // Ruta corregida según tu estructura real
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
@@ -15,12 +16,12 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Almacenamiento
+// 2. Almacenamiento en Cloudinary
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'retail-24h-uploads',
-    allowed_formats: ['jpg', 'png', 'jpeg','webp'],
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
   },
 });
 
@@ -29,29 +30,47 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-// --- RUTAS PROTEGIDAS Y SEGURAS ---
+// --- SEGURIDAD ---
 
+// Limitador de tasa para evitar abusos en el escaneo de EANs
 const scanLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 100,
-    message: "Demasiadas consultas."
+    message: "Demasiadas consultas desde esta IP."
 });
 
-// IA: Escaneo y detección
+/**
+ * MIDDLEWARE DE AUTENTICACIÓN GLOBAL PARA PRODUCTOS
+ * Esto asegura que req.user esté disponible en todos los controladores de abajo.
+ */
+router.use(authMiddleware); 
+
+// --- RUTAS ---
+
+// IA: Escaneo y detección de productos mediante imagen
 router.post('/detectar', (req, res, next) => {
   upload.single('imagen')(req, res, (err) => {
-    if (err) return res.status(500).json({ error: "Error en carga de imagen" });
+    if (err) {
+      console.error("Error Multer/Cloudinary:", err.message);
+      return res.status(500).json({ error: "Error en carga de imagen" });
+    }
     next();
   });
 }, productoController.detectarYGuardar);
 
-// CRUD de Productos (Aquí usaremos Sequelize en el controlador)
+// Obtener inventario completo del usuario logueado
 router.get('/', productoController.obtenerTodos);
+
+// Buscar un producto específico por EAN (con limitador de tasa)
 router.get('/buscar/:ean', scanLimiter, productoController.buscarPorCodigo);
-router.put('/:id', productoController.actualizar); // Este es el que usa el frontend para precios
+
+// Actualización de producto (Precios, nombres, etc.)
+router.put('/:id', productoController.actualizar);
+
+// Eliminación de producto
 router.delete('/:id', productoController.eliminar);
 
-// Stock para el bot de WhatsApp
+// Ajuste de stock (Utilizado por el bot de WhatsApp o integraciones)
 router.put('/stock/:ean', productoController.ajustarStock);
 
 module.exports = router;
