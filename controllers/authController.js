@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 exports.googleLogin = async (req, res) => {
-    const { idToken } = req.body; // El token que viene del frontend
+    const { idToken } = req.body; 
 
     try {
         // 1. Validar el token con Google
@@ -15,32 +15,35 @@ exports.googleLogin = async (req, res) => {
         const payload = ticket.getPayload();
         const { email, name, picture } = payload;
 
-        // 2. Buscar o Crear el usuario en Aiven
-        let user = await Usuario.findOne({ where: { email } });
+        // 2. Buscar el usuario en la lista blanca (Base de datos Aiven)
+        // IMPORTANTE: Aquí NO creamos al usuario si no existe.
+        const user = await Usuario.findOne({ where: { email } });
 
         if (!user) {
-            // Si no existe, lo creamos (Login Social)
-            // Le ponemos una pass aleatoria porque usará OAuth
-            user = await Usuario.create({
-                nombre: name,
-                email: email,
-                password: Math.random().toString(36).slice(-10), // Pass dummy
-                rol: 'admin' 
+            console.log(`🚫 Intento de acceso bloqueado: ${email} no está autorizado.`);
+            return res.status(403).json({ 
+                error: "No tienes permisos de acceso",
+                mensaje: "Este correo no figura en la lista de personal autorizado."
             });
-            console.log(`✅ [AIVEN] Nuevo usuario creado vía Google: ${email}`);
         }
 
-        // 3. Generar TU Token JWT para el resto de la sesión
+        // 3. Generar JWT propio (usando tu JWT_SECRET de Render)
         const token = jwt.sign(
             { id: user.id, email: user.email, rol: user.rol },
             process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
 
+        console.log(`✅ Acceso concedido a: ${email}`);
+
         res.json({
-            mensaje: "Autenticación exitosa",
+            success: true,
             token,
-            user: { nombre: user.nombre, email: user.email, foto: picture }
+            user: { 
+                nombre: user.nombre, 
+                email: user.email, 
+                foto: picture // Usamos la de Google para el avatar
+            }
         });
 
     } catch (error) {
