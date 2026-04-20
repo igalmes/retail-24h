@@ -12,11 +12,24 @@ const pagoRoutes = require('./routes/pagoRoutes');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Variable global para capturar el QR
 global.ultimoQR = null;
 
 app.use(cors());
 app.use(express.json());
+
+// --- CONFIGURACIÓN DE FRONTEND (Prioridad para Assets) ---
+const distPath = path.resolve(process.cwd(), 'client', 'dist');
+
+// Servir la carpeta assets con prioridad absoluta
+app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+        if (path.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+    }
+}));
+
+// Servir el resto de dist
+app.use(express.static(distPath));
 
 // --- RUTA PARA EL QR ---
 app.get('/qr', (req, res) => {
@@ -49,40 +62,26 @@ app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', pagoRoutes); 
 
-// --- CONFIGURACIÓN CRÍTICA PARA EL FRONTEND (VITE) ---
-
-// Definimos la ruta absoluta a la carpeta dist
-const distPath = path.resolve(process.cwd(), 'client', 'dist');
-
-// 1. Forzar el servicio de la carpeta 'assets' (Donde están el JS y el CSS)
-// Esto asegura que el navegador encuentre /assets/index-XXXX.css
-app.use('/assets', express.static(path.join(distPath, 'assets')));
-
-// 2. Servir el resto de la carpeta dist (favicon, imágenes estáticas, etc)
-app.use(express.static(distPath));
-
-// 3. Fallback para React Router: Cualquier ruta que no sea API o Assets, sirve el index.html
+// Fallback para React Router
 app.get('*', (req, res) => {
     const indexPath = path.join(distPath, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(200).send("API Online. Si ves esto, Render no terminó de buildeado el frontend en: " + distPath);
+        res.status(200).send("API Online. Esperando build final en: " + distPath);
     }
 });
 
-// --- ARRANQUE DEL SISTEMA ---
+// --- ARRANQUE ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión con DB (Aiven) OK.');
-
+        console.log('📡 Conexión con DB OK.');
         const Usuario = require('./models/Usuario');
         await sequelize.sync({ alter: false }); 
         
         app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 [READY]: Retail 24h AI corriendo en puerto ${PORT}`);
-            
+            console.log(`🚀 [READY]: Retail 24h corriendo en puerto ${PORT}`);
             setTimeout(() => {
                 whatsappBot.initialize(1).catch(err => {
                     console.error("⚠️ [BOT ERROR]:", err.message);
