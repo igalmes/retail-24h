@@ -7,17 +7,18 @@ const sequelize = require('./config/db');
 const whatsappBot = require('./services/whatsappService');
 const authRoutes = require('./routes/authRoutes');
 const verifyToken = require('./middleware/auth');
+const pagoRoutes = require('./routes/pagoRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Variable global para capturar el QR desde el servicio
+// Variable global para capturar el QR
 global.ultimoQR = null;
 
 app.use(cors());
 app.use(express.json());
 
-// --- RUTA PARA VER EL QR EN EL NAVEGADOR ---
+// --- RUTA PARA EL QR ---
 app.get('/qr', (req, res) => {
     if (!global.ultimoQR) {
         return res.send(`
@@ -30,7 +31,6 @@ app.get('/qr', (req, res) => {
             </html>
         `);
     }
-    
     res.send(`
         <html>
             <body style="background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; margin: 0;">
@@ -38,7 +38,6 @@ app.get('/qr', (req, res) => {
                 <div style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
                     <img src="${global.ultimoQR}" style="width: 350px; height: 350px; image-rendering: pixelated;" />
                 </div>
-                <p style="margin-top: 20px; color: #aaa;">La página se refresca sola cada 30 segundos.</p>
                 <script>setTimeout(() => { location.reload(); }, 30000);</script>
             </body>
         </html>
@@ -48,32 +47,42 @@ app.get('/qr', (req, res) => {
 // --- RUTAS API ---
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
-app.use('/api/pagos', verifyToken, require('./routes/pagoRoutes'));
+app.use('/api/pagos', pagoRoutes); 
 
-// --- FRONTEND ---
-const distPath = path.resolve(__dirname, 'client', 'dist');
+// --- CONFIGURACIÓN CRÍTICA PARA EL FRONTEND (VITE) ---
+
+// Definimos la ruta absoluta a la carpeta dist
+const distPath = path.resolve(process.cwd(), 'client', 'dist');
+
+// 1. Forzar el servicio de la carpeta 'assets' (Donde están el JS y el CSS)
+// Esto asegura que el navegador encuentre /assets/index-XXXX.css
+app.use('/assets', express.static(path.join(distPath, 'assets')));
+
+// 2. Servir el resto de la carpeta dist (favicon, imágenes estáticas, etc)
 app.use(express.static(distPath));
 
+// 3. Fallback para React Router: Cualquier ruta que no sea API o Assets, sirve el index.html
 app.get('*', (req, res) => {
     const indexPath = path.join(distPath, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(200).send("API Online. El frontend aún no está listo en: " + distPath);
+        res.status(200).send("API Online. Si ves esto, Render no terminó de buildeado el frontend en: " + distPath);
     }
 });
 
-// --- ARRANQUE ---
+// --- ARRANQUE DEL SISTEMA ---
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        console.log('📡 Conexión con DB OK.');
+        console.log('📡 Conexión con DB (Aiven) OK.');
 
         const Usuario = require('./models/Usuario');
-        await Usuario.sync(); 
+        await sequelize.sync({ alter: false }); 
         
         app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 [READY]: Servidor en puerto ${PORT}`);
+            console.log(`🚀 [READY]: Retail 24h AI corriendo en puerto ${PORT}`);
+            
             setTimeout(() => {
                 whatsappBot.initialize(1).catch(err => {
                     console.error("⚠️ [BOT ERROR]:", err.message);
