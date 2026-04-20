@@ -6,9 +6,7 @@ const axios = require('axios');
  * DETECTAR Y GUARDAR (IA + SEPA + DB)
  * Blindado con UsuarioId para multi-tenancy (SaaS)
  */
-const Producto = require('../models/Producto');
-const geminiService = require('../services/geminiService');
-const axios = require('axios');
+
 
 exports.detectarYGuardar = async (req, res) => {
     try {
