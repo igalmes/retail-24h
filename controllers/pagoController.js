@@ -47,18 +47,19 @@ exports.crearPreferencia = async (req, res) => {
             : null;
 
         const response = await preference.create({
-            body: {
-                items: itemsVerificados,
-                back_urls: {
-                    success: `${process.env.URL_FRONTEND}/success`,
-                    failure: `${process.env.URL_FRONTEND}/failure`,
-                    pending: `${process.env.URL_FRONTEND}/pending`,
-                },
-                auto_return: "approved",
-                external_reference: nuevoPedido.id.toString(),
-                notification_url: webhookUrl
-            }
-        });
+    body: {
+        items: itemsVerificados,
+        back_urls: {
+            // Mercado Pago requiere estas URLs para el auto_return
+            success: process.env.URL_FRONTEND ? `${process.env.URL_FRONTEND}/success` : "http://localhost:5173/success",
+            failure: process.env.URL_FRONTEND ? `${process.env.URL_FRONTEND}/failure` : "http://localhost:5173/failure",
+            pending: process.env.URL_FRONTEND ? `${process.env.URL_FRONTEND}/pending` : "http://localhost:5173/pending",
+        },
+        auto_return: "approved", // Ahora sí funcionará porque definimos success arriba
+        external_reference: nuevoPedido.id.toString(),
+        notification_url: webhookUrl
+    }
+});
 
         await nuevoPedido.update({ mp_preference_id: response.id });
         res.json({ id: response.id, init_point: response.init_point });
