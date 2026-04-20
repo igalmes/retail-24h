@@ -113,28 +113,37 @@ function App() {
   };
 
   const manejarPago = async () => {
+    if (carrito.length === 0) return;
     try {
-      setCargando(true);
-      const res = await fetch(`${API_URL}/pagos/crear-preferencia`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ 
-          items: carrito.map(p => ({
-            id: p.id,
-            title: p.nombre, // MercadoPago espera 'title'
-            unit_price: Number(p.precio_actualizado),
-            quantity: 1
-          }))
-        })
-      });
-      const data = await res.json();
-      if (data.init_point) window.location.href = data.init_point;
-    } catch (err) { alert("Error con Mercado Pago"); } 
-    finally { setCargando(false); }
-  };
+        setCargando(true);
+        const res = await fetch(`${API_URL}/pagos/crear-preferencia`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({ 
+                // IMPORTANTE: Mercado Pago usa 'title' y 'unit_price' (como número)
+                items: carrito.map(p => ({
+                    id: String(p.id),
+                    title: p.nombre, 
+                    unit_price: Number(p.precio_actualizado), 
+                    quantity: 1
+                }))
+            })
+        });
+        const data = await res.json();
+        if (data.init_point) {
+            window.location.href = data.init_point;
+        } else {
+            alert("El servidor no devolvió un punto de inicio de pago.");
+        }
+    } catch (err) { 
+        alert("Error al conectar con Mercado Pago"); 
+    } finally { 
+        setCargando(false); 
+    }
+};
 
   if (!token) {
     return (

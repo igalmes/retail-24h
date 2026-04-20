@@ -6,13 +6,13 @@ const Producto = sequelize.define('Producto', {
     marca: { type: DataTypes.STRING },
     categoria: { type: DataTypes.STRING },
     precio_sugerido: { type: DataTypes.DECIMAL(10, 2) },
-    precio_referencia: { type: DataTypes.DECIMAL(10, 2) },
+    // CAMBIO AQUÍ: unificado con el controlador y frontend
+    precio_actualizado: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 }, 
     stock_actual: { type: DataTypes.INTEGER, defaultValue: 0 },
     stock_minimo: { type: DataTypes.INTEGER, defaultValue: 5 },
     imagen_url: { type: DataTypes.STRING },
-    codigo_barras: { type: DataTypes.STRING }, // Sacamos el unique: true porque dos comercios pueden tener el mismo producto
+    codigo_barras: { type: DataTypes.STRING },
     ultima_sincronizacion_api: { type: DataTypes.DATE },
-    // CLAVE PARA MULTI-TENANT:
     UsuarioId: {
         type: DataTypes.INTEGER,
         allowNull: false,
