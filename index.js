@@ -14,31 +14,42 @@ const PORT = process.env.PORT || 10000;
 
 global.ultimoQR = null;
 
+// 1. MIDDLEWARES GLOBALES
 app.use(cors());
 app.use(express.json());
 
-// --- CONFIGURACIÓN DE FRONTEND (Prioridad para Assets) ---
+// 2. CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS (UX/UI CRÍTICO)
+// Usamos path.resolve con process.cwd() para que Render encuentre la carpeta dist siempre.
 const distPath = path.resolve(process.cwd(), 'client', 'dist');
 
-// Servir la carpeta assets con prioridad absoluta
+// Servimos la carpeta assets específicamente con headers de cache y tipo
 app.use('/assets', express.static(path.join(distPath, 'assets'), {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-        if (path.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+    immutable: true,
+    maxAge: '1y',
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+        if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
     }
 }));
 
-// Servir el resto de dist
+// Servimos el resto de la carpeta dist (favicon, etc)
 app.use(express.static(distPath));
 
-// --- RUTA PARA EL QR ---
+// 3. RUTAS DE LA API
+app.use('/api/auth', authRoutes);
+app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
+app.use('/api/pagos', pagoRoutes); 
+
+// 4. RUTA PARA EL QR (Interfaz mejorada)
 app.get('/qr', (req, res) => {
     if (!global.ultimoQR) {
         return res.send(`
             <html>
-                <body style="background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-                    <h2>El QR aún no se ha generado o el bot ya está conectado.</h2>
-                    <p>Esperá unos segundos y refrescá la página.</p>
+                <body style="background:#0f172a;color:#f8fafc;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+                    <div style="padding:2rem;background:#1e293b;border-radius:1rem;text-align:center;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);">
+                        <h2>⏳ Generando QR...</h2>
+                        <p>El bot se está iniciando. Refrescamos en breve.</p>
+                    </div>
                     <script>setTimeout(() => { location.reload(); }, 3000);</script>
                 </body>
             </html>
@@ -46,38 +57,34 @@ app.get('/qr', (req, res) => {
     }
     res.send(`
         <html>
-            <body style="background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; margin: 0;">
-                <h2 style="margin-bottom: 20px;">Escaneá este QR con WhatsApp</h2>
-                <div style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-                    <img src="${global.ultimoQR}" style="width: 350px; height: 350px; image-rendering: pixelated;" />
+            <body style="background:#0f172a;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+                <h2 style="color:#f8fafc;margin-bottom:1.5rem;">Escaneá para Vincular WhatsApp</h2>
+                <div style="background:#fff;padding:1.5rem;border-radius:1.5rem;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+                    <img src="${global.ultimoQR}" style="width:350px;height:350px;display:block;" />
                 </div>
+                <p style="color:#94a3b8;margin-top:1.5rem;">Vigencia del QR: 30 segundos.</p>
                 <script>setTimeout(() => { location.reload(); }, 30000);</script>
             </body>
         </html>
     `);
 });
 
-// --- RUTAS API ---
-app.use('/api/auth', authRoutes);
-app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
-app.use('/api/pagos', pagoRoutes); 
-
-// Fallback para React Router
+// 5. FALLBACK PARA REACT (Single Page Application)
+// Esto debe ir después de todas las rutas de la API
 app.get('*', (req, res) => {
     const indexPath = path.join(distPath, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(200).send("API Online. Esperando build final en: " + distPath);
+        res.status(200).send("API Online. Si no ves la web, revisá que el build de Vite se haya ejecutado en Render.");
     }
 });
 
-// --- ARRANQUE ---
+// 6. ARRANQUE DEL SERVIDOR
 const startServer = async () => {
     try {
         await sequelize.authenticate();
         console.log('📡 Conexión con DB OK.');
-        const Usuario = require('./models/Usuario');
         await sequelize.sync({ alter: false }); 
         
         app.listen(PORT, '0.0.0.0', () => {
