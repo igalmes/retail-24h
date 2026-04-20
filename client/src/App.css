@@ -200,3 +200,74 @@ td { padding: 1.2rem; border-top: 1px solid var(--border); vertical-align: middl
   .content-header, .action-bar, .table-container { margin: 10px; padding: 1rem; }
   .d-none-mobile { display: none; }
 }
+
+.sidebar-nav {
+  margin-top: 1rem;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 10px 15px;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.nav-btn.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.btn-clear {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid #f87171;
+  width: 100%;
+  padding: 5px;
+  margin-top: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-clear:hover {
+  background: #f87171;
+  color: white;
+}
+
+.btn-logout {
+  width: 100%;
+  background: #334155;
+  color: #94a3b8;
+  border: none;
+  padding: 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: auto;
+}
+
+.placeholder-module {
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+/* Ajuste para que la sidebar sea flexible */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+}
