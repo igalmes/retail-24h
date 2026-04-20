@@ -1,50 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  --primary: #2563eb; /* Azul corporativo */
-  --secondary: #64748b;
-  --success: #10b981;
-  --bg-main: #f1f5f9;
-  --sidebar-dark: #0f172a; /* Azul noche profundo */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --sidebar-dark: #0f172a;
+  --bg-main: #f8fafc;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
   --white: #ffffff;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
 }
 
-/* Mejora de la Sidebar */
+/* 1. RESET CRÍTICO - Esto arregla las imágenes gigantes */
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+/* 2. LAYOUT ESTRUCTURAL */
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* 3. SIDEBAR PROFESIONAL */
 .sidebar {
+  width: 260px;
   background: var(--sidebar-dark);
-  border-right: 1px solid rgba(255,255,255,0.05);
+  color: var(--white);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
 }
 
 .sidebar-brand {
-  font-family: 'Inter', sans-serif;
-  letter-spacing: -0.5px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: var(--white);
 }
 
-/* El "Price Tag" editable */
+/* 4. ÁREA DE CONTENIDO */
+.main-content {
+  margin-left: 260px; /* Espacio para la sidebar */
+  flex: 1;
+  padding: 2rem;
+}
+
+/* 5. PRODUCT CARDS (El corazón del Dashboard) */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.product-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow);
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.product-info {
+  padding: 1.25rem;
+}
+
+/* 6. PRICE TAG EDITABLE (UX Mejorada) */
+.price-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
 .price-tag {
+  font-weight: 700;
+  font-size: 1.1rem;
   color: var(--primary);
   background: #eff6ff;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: 0.2s;
-  display: inline-block;
+  border: 1px solid transparent;
 }
 
 .price-tag:hover {
+  border-color: var(--primary);
   background: #dbeafe;
-  transform: scale(1.05);
 }
 
 .edit-price-input {
-  width: 80px;
-  padding: 4px;
+  width: 100px;
+  font-weight: 700;
+  padding: 5px 10px;
   border: 2px solid var(--primary);
-  border-radius: 4px;
-  outline: none;
+  border-radius: 8px;
+  color: var(--primary);
 }
 
-/* Cards para móviles más elegantes */
-.product-card-mobile {
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+/* 7. BOTONES */
+.btn-save {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-save:hover { background: var(--primary-hover); }
+
+/* 8. RESPONSIVE */
+@media (max-width: 768px) {
+  .sidebar { width: 0; display: none; }
+  .main-content { margin-left: 0; padding: 1rem; }
+  .product-grid { grid-template-columns: 1fr; }
 }
