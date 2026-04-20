@@ -6,7 +6,6 @@ const API_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:4000/api' 
     : 'https://retail-24h.onrender.com/api';
 
-// REEMPLAZAR con tu Client ID de Google Cloud Console
 const GOOGLE_CLIENT_ID = "264704665731-hi7jv7mvdnrud4cfoumuth3sok12mdb3.apps.googleusercontent.com"; 
 
 function App() {
@@ -16,7 +15,14 @@ function App() {
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [carrito, setCarrito] = useState([]);
+  const [editando, setEditando] = useState(null); 
   const fileInputRef = useRef(null);
+
+  // Simulación de configuración del comercio (Esto podría venir de una DB luego)
+  const [configComercio] = useState({
+    nombre: "Retail 24h AI",
+    logo: null 
+  });
 
   const logout = () => {
     setUser(null);
@@ -31,9 +37,7 @@ function App() {
       const res = await fetch(`${API_URL}/productos`, {
         headers: { 'Authorization': `Bearer ${token}` }
       }); 
-      
       if (res.status === 401 || res.status === 403) return logout();
-
       const resData = await res.json();
       const productosRecibidos = resData.data || resData;
       if (Array.isArray(productosRecibidos)) setLista(productosRecibidos);
@@ -56,9 +60,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken: credentialResponse.credential })
       });
-      
       const data = await res.json();
-
       if (res.ok && data.token) {
         setToken(data.token);
         setUser(data.user);
@@ -67,7 +69,7 @@ function App() {
         alert(data.error || "Acceso denegado");
       }
     } catch (err) {
-      alert("Error al conectar con el servidor de autenticación");
+      alert("Error de conexión");
     } finally {
       setCargando(false);
     }
@@ -94,19 +96,62 @@ function App() {
     }
   };
 
-  // VISTA DE LOGIN
+  const actualizarPrecio = async (id, nuevoPrecio) => {
+    try {
+      const res = await fetch(`${API_URL}/productos/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ precio_actualizado: Number(nuevoPrecio) })
+      });
+      if (res.ok) {
+        setLista(lista.map(p => p.id === id ? { ...p, precio_actualizado: nuevoPrecio } : p));
+        setEditando(null);
+      }
+    } catch (err) {
+      alert("Error al actualizar precio");
+    }
+  };
+
+  const manejarPago = async () => {
+    try {
+      setCargando(true);
+      const res = await fetch(`${API_URL}/pagos/crear-preferencia`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          items: carrito.map(p => ({
+            id: p.id,
+            nombre: p.nombre,
+            precio: p.precio_actualizado || p.precio_sugerido,
+            quantity: 1
+          }))
+        })
+      });
+      const data = await res.json();
+      if (data.init_point) {
+        window.location.href = data.init_point;
+      }
+    } catch (err) {
+      alert("Error al conectar con Mercado Pago");
+    } finally {
+      setCargando(false);
+    }
+  };
+
   if (!token) {
     return (
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <div className="login-screen">
           <div className="login-box">
-            <h1>Retail 24h</h1>
+            <h1>{configComercio.nombre}</h1>
             <p>Consola de Gestión IA</p>
-            <GoogleLogin 
-              onSuccess={handleGoogleSuccess} 
-              onError={() => alert("Error en Google Login")}
-              useOneTap
-            />
+            <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => {}} useOneTap />
             {cargando && <p className="mt-3">Validando...</p>}
           </div>
         </div>
@@ -114,48 +159,82 @@ function App() {
     );
   }
 
-  // VISTA DE DASHBOARD (Solo si hay token)
   return (
     <div className="admin-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand"><span className="brand-dot"></span> Retail 24h</div>
+        <div className="sidebar-brand">
+          <span className="brand-dot"></span> {configComercio.nombre}
+        </div>
         <div className="cart-card">
           <p className="cart-label">RESUMEN DE VENTA</p>
           <div className="cart-row"><span>Items:</span><b>{carrito.length}</b></div>
-          <div className="cart-row"><span>Total:</span><b className="total-price">${carrito.reduce((acc, p) => acc + Number(p.precio_actualizado || p.precio_sugerido), 0).toLocaleString()}</b></div>
-          <button className="btn-pay" disabled={carrito.length === 0 || cargando}>PAGAR</button>
+          <div className="cart-row">
+            <span>Total:</span>
+            <b className="total-price">
+              ${carrito.reduce((acc, p) => acc + Number(p.precio_actualizado || p.precio_sugerido || 0), 0).toLocaleString()}
+            </b>
+          </div>
+          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
+            {cargando ? 'PROCESANDO...' : 'PAGAR'}
+          </button>
         </div>
         <button className="btn-logout" onClick={logout}>Cerrar Sesión</button>
       </aside>
 
       <main className="content">
         <header className="content-header">
-          <div><h2>Inventario</h2><p className="d-none-mobile">Sincronizado con Aiven</p></div>
+          <div><h2>Inventario</h2><p className="d-none-mobile">Sincronizado con Aiven Cloud</p></div>
           <div className="user-badge">
-            <span className="d-none-mobile">{user?.nombre || 'Admin'}</span>
+            <span className="d-none-mobile">{user?.nombre || 'Administrador'}</span>
             <div className="avatar" style={{backgroundImage: `url(${user?.foto})`}}></div>
           </div>
         </header>
 
         <section className="p-4">
           <div className="action-bar">
-            <input type="text" placeholder="🔍 Buscar..." className="search-input" onChange={(e) => setBusqueda(e.target.value)} />
+            <input type="text" placeholder="🔍 Buscar por nombre o EAN..." className="search-input" onChange={(e) => setBusqueda(e.target.value)} />
             <input type="file" ref={fileInputRef} hidden onChange={manejarEscaneo} accept="image/*" />
-            <button className="btn-scan" onClick={() => fileInputRef.current.click()}>ESCANEAR</button>
+            <button className="btn-scan" onClick={() => fileInputRef.current.click()}>📸 ESCANEAR</button>
           </div>
 
-          <div className="table-container d-none-mobile">
+          <div className="table-container">
             <table>
-              <thead><tr><th>Producto</th><th>Precio</th><th>Acción</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Precio (Clic para editar)</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
               <tbody>
-                {lista.filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase())).map((p) => (
+                {lista.filter(p => 
+                  p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
+                  p.codigo_barras?.includes(busqueda)
+                ).map((p) => (
                   <tr key={p.id}>
                     <td className="d-flex align-items-center gap-3">
-                      <img src={p.fotoUrl || p.imagen_url} className="prod-img" alt="" />
+                      <img src={p.fotoUrl || p.imagen_url || 'https://via.placeholder.com/50'} className="prod-img" alt="" />
                       <div><b>{p.nombre}</b><br/><small>EAN: {p.codigo_barras}</small></div>
                     </td>
-                    <td><b>${p.precio_actualizado}</b></td>
-                    <td><button className="btn-add" onClick={() => setCarrito([...carrito, p])}>+</button></td>
+                    <td>
+                      {editando === p.id ? (
+                        <input 
+                          type="number" 
+                          className="edit-price-input"
+                          defaultValue={p.precio_actualizado}
+                          onBlur={(e) => actualizarPrecio(p.id, e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && actualizarPrecio(p.id, e.target.value)}
+                          autoFocus
+                        />
+                      ) : (
+                        <b className="price-tag" onClick={() => setEditando(p.id)}>
+                          ${Number(p.precio_actualizado).toLocaleString()} ✎
+                        </b>
+                      )}
+                    </td>
+                    <td>
+                      <button className="btn-add" onClick={() => setCarrito([...carrito, p])}>+</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

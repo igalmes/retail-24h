@@ -1,42 +1,47 @@
-const { Preference } = require('mercadopago');
+const { Preference, Payment } = require('mercadopago');
 const client = require('../config/mpConfig');
 const Pedido = require('../models/Pedido');
+const Producto = require('../models/Producto');
 
 exports.crearPreferencia = async (req, res) => {
-    console.log("--- [RETAIL 24H] INICIO DE PROCESO DE PAGO ---");
     try {
         const { items } = req.body;
+        if (!items || items.length === 0) return res.status(400).json({ error: "Carrito vacío" });
 
-        // 1. Validación de entrada
-        if (!items || items.length === 0) {
-            console.error("❌ ERROR: Carrito vacío");
-            return res.status(400).json({ error: "El carrito está vacío" });
-        }
+        // SEGURIDAD: Cruzamos contra la DB para evitar manipulación de precios en el front
+        const itemsVerificados = await Promise.all(items.map(async (item) => {
+            const productoDB = await Producto.findOne({ 
+                where: { id: item.id, UsuarioId: req.user.id } 
+            });
 
-        // 2. Normalización estricta para MP v2
-        const itemsProcesados = items.map(item => ({
-            id: item.id?.toString() || 'prod-gen',
-            title: item.nombre || item.title || 'Producto Retail 24h',
-            unit_price: Number(item.unit_price || item.precio), // DEBE SER NUMBER
-            quantity: Number(item.quantity || 1),               // DEBE SER NUMBER
-            currency_id: 'ARS'
+            if (!productoDB) throw new Error(`Producto ${item.id} no autorizado`);
+
+            return {
+                id: productoDB.id.toString(),
+                title: productoDB.nombre,
+                unit_price: Number(productoDB.precio_actualizado || productoDB.precio_sugerido),
+                quantity: Number(item.quantity || 1),
+                currency_id: 'ARS'
+            };
         }));
 
-        // 3. Crear pedido en DB (Estado inicial)
-        const totalPedido = itemsProcesados.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
-        const nuevoPedido = await Pedido.create({ total: totalPedido, estado: 'pendiente' });
+        const totalPedido = itemsVerificados.reduce((acc, i) => acc + (i.unit_price * i.quantity), 0);
 
-        // 4. Configurar Preferencia
+        // Registro del pedido vinculado al usuario logueado
+        const nuevoPedido = await Pedido.create({ 
+            total: totalPedido, 
+            estado_pago: 'pendiente',
+            UsuarioId: req.user.id 
+        });
+
         const preference = new Preference(client);
-        
-        // Evitamos que explote si URL_BACKEND no está definida o es localhost
         const webhookUrl = (process.env.URL_BACKEND && !process.env.URL_BACKEND.includes('localhost')) 
             ? `${process.env.URL_BACKEND}/api/pagos/webhook` 
             : null;
 
         const response = await preference.create({
             body: {
-                items: itemsProcesados,
+                items: itemsVerificados,
                 back_urls: {
                     success: `${process.env.URL_FRONTEND}/success`,
                     failure: `${process.env.URL_FRONTEND}/failure`,
@@ -48,26 +53,35 @@ exports.crearPreferencia = async (req, res) => {
             }
         });
 
-        // 5. Guardar ID de preferencia
         await nuevoPedido.update({ mp_preference_id: response.id });
-
-        console.log("✅ PREFERENCIA CREADA:", response.id);
         res.json({ id: response.id, init_point: response.init_point });
 
     } catch (error) {
-        console.error("❌ ERROR CRÍTICO EN PREFERENCIA:");
-        
-        // ESTA PARTE ES LA QUE VA A MATAR EL [object Object]
-        if (error.apiResponse) {
-            // Error específico de la API de Mercado Pago
-            const errorDetalle = await error.apiResponse.json();
-            console.log("🔍 DETALLE TÉCNICO MP:", JSON.stringify(errorDetalle, null, 2));
-        } else {
-            // Error de código u otro tipo
-            console.log("🔍 MENSAJE DE ERROR:", error.message);
-            console.log("🔍 STACK:", error.stack);
-        }
+        console.error("❌ Error en Preferencia:", error.message);
+        res.status(500).json({ error: "Error al procesar el pago" });
+    }
+};
 
-        res.status(500).json({ error: "Error interno en el servidor de pagos" });
+exports.recibirWebhook = async (req, res) => {
+    try {
+        const { query } = req;
+        if ((query.topic || query.type) === 'payment') {
+            const paymentId = query.id || query['data.id'];
+            const payment = await new Payment(client).get({ id: paymentId });
+            const pedidoId = payment.external_reference;
+
+            if (pedidoId && payment.status === 'approved') {
+                const pedido = await Pedido.findByPk(pedidoId);
+                // Idempotencia: Solo actualizamos si no estaba aprobado
+                if (pedido && pedido.estado_pago !== 'approved') {
+                    await Pedido.update({ estado_pago: 'approved' }, { where: { id: pedidoId } });
+                    console.log(`✅ Pago confirmado para Pedido #${pedidoId}`);
+                }
+            }
+        }
+        res.sendStatus(200);
+    } catch (error) {
+        console.error("❌ Webhook Error:", error.message);
+        res.sendStatus(500);
     }
 };

@@ -8,21 +8,14 @@ const rateLimit = require('express-rate-limit');
 
 require('dotenv').config();
 
-// 1. Configuración de Cloudinary
-// Usamos nombres estándar para evitar confusiones
+// 1. Cloudinary Config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Verificación de carga (Esto saldrá en tu PowerShell)
-console.log("--- [DEBUG ROUTES] Verificando Env ---");
-console.log("Cloud Name:", process.env.CLOUDINARY_NAME ? "✅ OK" : "❌ FALTANTE");
-console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✅ OK" : "❌ FALTANTE");
-console.log("--------------------------------------");
-
-// 3. Configuración del almacenamiento
+// 2. Almacenamiento
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -31,38 +24,34 @@ const storage = new CloudinaryStorage({
   },
 });
 
-// 4. Middleware de Multer con manejo de errores interno
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // Límite de 5MB por imagen
+  limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-// --- DEFINICIÓN DE RUTAS ---
+// --- RUTAS PROTEGIDAS Y SEGURAS ---
 
-// POST: Analizar imagen (IA)
-// Agregamos un pequeño fix para capturar errores de subida antes del controlador
+const scanLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 100,
+    message: "Demasiadas consultas."
+});
+
+// IA: Escaneo y detección
 router.post('/detectar', (req, res, next) => {
   upload.single('imagen')(req, res, (err) => {
-    if (err) {
-      console.error("❌ [MULTER/CLOUDINARY ERROR]:", err.message);
-      return res.status(500).json({ error: "Error al subir a la nube", details: err.message });
-    }
+    if (err) return res.status(500).json({ error: "Error en carga de imagen" });
     next();
   });
 }, productoController.detectarYGuardar);
 
-const scanLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // limita cada IP a 100 peticiones por ventana
-    message: "Demasiadas consultas desde este dispositivo."
-});
-
-// Nueva ruta para el bot
-router.get('/buscar/:ean', scanLimiter, productoController.buscarPorCodigo);
-
+// CRUD de Productos (Aquí usaremos Sequelize en el controlador)
 router.get('/', productoController.obtenerTodos);
-router.put('/:id', productoController.actualizar);
+router.get('/buscar/:ean', scanLimiter, productoController.buscarPorCodigo);
+router.put('/:id', productoController.actualizar); // Este es el que usa el frontend para precios
 router.delete('/:id', productoController.eliminar);
+
+// Stock para el bot de WhatsApp
 router.put('/stock/:ean', productoController.ajustarStock);
 
 module.exports = router;

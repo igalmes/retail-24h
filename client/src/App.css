@@ -1,207 +1,50 @@
-/* VARIABLES Y RESET */
 :root {
-  --primary: #15803d;
-  --primary-dark: #166534;
-  --bg-main: #f8fafc;
-  --sidebar-dark: #1a202c;
-  --text-main: #1e293b;
+  --primary: #2563eb; /* Azul corporativo */
+  --secondary: #64748b;
+  --success: #10b981;
+  --bg-main: #f1f5f9;
+  --sidebar-dark: #0f172a; /* Azul noche profundo */
+  --white: #ffffff;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--bg-main);
-  color: var(--text-main);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Layout Principal */
-.admin-layout {
-  display: flex;
-  flex-direction: row;
-  min-height: 100vh;
-}
-
-/* Sidebar */
+/* Mejora de la Sidebar */
 .sidebar {
-  width: 280px;
-  background-color: var(--sidebar-dark);
-  color: white;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  z-index: 100;
-  box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+  background: var(--sidebar-dark);
+  border-right: 1px solid rgba(255,255,255,0.05);
 }
 
 .sidebar-brand {
-  padding: 25px;
-  font-weight: 800;
-  font-size: 1.4rem;
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.5px;
+  color: var(--white);
 }
 
-.brand-dot {
-  height: 12px;
-  width: 12px;
-  background-color: #22c55e;
-  border-radius: 50%;
-  margin-right: 10px;
-}
-
-/* Carrito / Resumen */
-.cart-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  margin: 20px;
-  padding: 20px;
-  border: 1px solid rgba(255,255,255,0.1);
-}
-
-.total-price {
-  font-family: 'Courier New', monospace; /* Fuente numérica */
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #22c55e;
-}
-
-.btn-pay {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 600;
+/* El "Price Tag" editable */
+.price-tag {
+  color: var(--primary);
+  background: #eff6ff;
+  padding: 4px 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
-  width: 100%;
+  transition: 0.2s;
+  display: inline-block;
 }
 
-.btn-pay:hover:not(:disabled) {
-  background-color: var(--primary-dark);
+.price-tag:hover {
+  background: #dbeafe;
+  transform: scale(1.05);
 }
 
-.btn-pay:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.edit-price-input {
+  width: 80px;
+  padding: 4px;
+  border: 2px solid var(--primary);
+  border-radius: 4px;
+  outline: none;
 }
 
-/* Contenido */
-.content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.content-header {
-  background: white;
-  padding: 20px 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.user-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.avatar {
-  width: 35px;
-  height: 35px;
-  background: #e2e8f0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: #475569;
-}
-
-/* Tabla Desktop */
-.table-container {
-  background: white;
-  border-radius: 12px;
-  margin: 20px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th {
-  background: #f1f5f9;
-  padding: 15px;
-  text-align: left;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  color: #64748b;
-}
-
-td {
-  padding: 15px;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.prod-img {
-  width: 45px;
-  height: 45px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-/* --- RESPONSIVE MÓVIL --- */
-@media (max-width: 768px) {
-  .admin-layout { flex-direction: column; }
-  .sidebar { 
-    width: 100%; 
-    height: auto; 
-    position: relative; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  }
-  
-  .d-none-mobile { display: none !important; }
-
-  .product-card-mobile {
-    background: white;
-    border-radius: 15px;
-    padding: 15px;
-    display: flex;
-    align-items: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin: 0 15px 15px 15px;
-  }
-
-  .btn-scan {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: var(--primary);
-    color: white;
-    border: none;
-    box-shadow: 0 8px 20px rgba(21, 128, 61, 0.4);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0;
-  }
-
-  .btn-scan::after {
-    content: '📸';
-    font-size: 24px;
-  }
+/* Cards para móviles más elegantes */
+.product-card-mobile {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
