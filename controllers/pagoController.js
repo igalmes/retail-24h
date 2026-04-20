@@ -8,7 +8,7 @@ exports.crearPreferencia = async (req, res) => {
         const { items } = req.body;
         if (!items || items.length === 0) return res.status(400).json({ error: "Carrito vacío" });
 
-        // SEGURIDAD: Cruzamos contra la DB para evitar manipulación de precios en el front
+        // SEGURIDAD: Cruzamos contra la DB y usamos el nuevo campo de precio
         const itemsVerificados = await Promise.all(items.map(async (item) => {
             const productoDB = await Producto.findOne({ 
                 where: { id: item.id, UsuarioId: req.user.id } 
@@ -16,10 +16,17 @@ exports.crearPreferencia = async (req, res) => {
 
             if (!productoDB) throw new Error(`Producto ${item.id} no autorizado`);
 
+            // Validación de precio: Prioriza el actualizado por el usuario
+            const precioFinal = parseFloat(productoDB.precio_actualizado) || parseFloat(productoDB.precio_sugerido) || 0;
+
+            if (precioFinal <= 0) {
+                throw new Error(`El producto ${productoDB.nombre} no tiene un precio válido asignado.`);
+            }
+
             return {
                 id: productoDB.id.toString(),
                 title: productoDB.nombre,
-                unit_price: Number(productoDB.precio_actualizado || productoDB.precio_sugerido),
+                unit_price: precioFinal,
                 quantity: Number(item.quantity || 1),
                 currency_id: 'ARS'
             };
@@ -27,7 +34,7 @@ exports.crearPreferencia = async (req, res) => {
 
         const totalPedido = itemsVerificados.reduce((acc, i) => acc + (i.unit_price * i.quantity), 0);
 
-        // Registro del pedido vinculado al usuario logueado
+        // Registro del pedido
         const nuevoPedido = await Pedido.create({ 
             total: totalPedido, 
             estado_pago: 'pendiente',
@@ -58,7 +65,7 @@ exports.crearPreferencia = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error en Preferencia:", error.message);
-        res.status(500).json({ error: "Error al procesar el pago" });
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -72,7 +79,6 @@ exports.recibirWebhook = async (req, res) => {
 
             if (pedidoId && payment.status === 'approved') {
                 const pedido = await Pedido.findByPk(pedidoId);
-                // Idempotencia: Solo actualizamos si no estaba aprobado
                 if (pedido && pedido.estado_pago !== 'approved') {
                     await Pedido.update({ estado_pago: 'approved' }, { where: { id: pedidoId } });
                     console.log(`✅ Pago confirmado para Pedido #${pedidoId}`);
