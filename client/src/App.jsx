@@ -16,7 +16,6 @@ function App() {
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   
-  // Persistencia del carrito: recupera de localStorage al iniciar
   const [carrito, setCarrito] = useState(() => {
     const guardado = localStorage.getItem('carrito');
     return guardado ? JSON.parse(guardado) : [];
@@ -25,10 +24,8 @@ function App() {
   const [editando, setEditando] = useState(null); 
   const [menuAbierto, setMenuAbierto] = useState(false);
   const fileInputRef = useRef(null);
-
   const [configComercio] = useState({ nombre: "Retail 24h AI" });
 
-  // Guardar carrito automáticamente cuando cambie
   useEffect(() => {
     localStorage.setItem('carrito', JSON.stringify(carrito));
   }, [carrito]);
@@ -41,7 +38,6 @@ function App() {
     setCarrito([]);
   };
 
-  // --- LÓGICA DE CARRITO PRO ---
   const agregarAlCarrito = (producto) => {
     setCarrito(prev => {
       const existe = prev.find(item => item.id === producto.id);
@@ -68,7 +64,6 @@ function App() {
     return carrito.find(item => item.id === id)?.cantidad || 0;
   };
 
-  // --- API CALLS ---
   const obtenerProductos = useCallback(async (silencioso = false) => {
     if (!token) return;
     try {
@@ -244,6 +239,13 @@ function App() {
             <div className="avatar" style={{backgroundImage: `url(${user?.foto || 'https://via.placeholder.com/40'})`}}></div>
           </div>
         </header>
+
+        {/* --- LA BARRA DE CARGA SE INYECTA AQUÍ --- */}
+        {cargando && (
+          <div className="loading-bar-container">
+            <div className="loading-bar-fill"></div>
+          </div>
+        )}
 
         {view === 'inventario' ? (
           <section style={{padding: '1.5rem'}}>
