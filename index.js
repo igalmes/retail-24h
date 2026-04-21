@@ -81,6 +81,7 @@ app.get('*', (req, res) => {
 // 6. ARRANQUE DEL SERVIDOR
 const startServer = async () => {
     try {
+	console.log('Intentando conectar a:', process.env.DATABASE_URL ? "URL Detectada" : "URL No definida");
         await sequelize.authenticate();
         console.log('📡 Conexión con DB OK.');
         
