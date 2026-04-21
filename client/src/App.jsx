@@ -15,19 +15,60 @@ function App() {
   const [view, setView] = useState('inventario');
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
-  const [carrito, setCarrito] = useState([]);
+  
+  // Persistencia del carrito: recupera de localStorage al iniciar
+  const [carrito, setCarrito] = useState(() => {
+    const guardado = localStorage.getItem('carrito');
+    return guardado ? JSON.parse(guardado) : [];
+  });
+
   const [editando, setEditando] = useState(null); 
-  const [menuAbierto, setMenuAbierto] = useState(false); // Estado para móvil
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const fileInputRef = useRef(null);
 
   const [configComercio] = useState({ nombre: "Retail 24h AI" });
+
+  // Guardar carrito automáticamente cuando cambie
+  useEffect(() => {
+    localStorage.setItem('carrito', JSON.stringify(carrito));
+  }, [carrito]);
 
   const logout = () => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('carrito');
+    setCarrito([]);
   };
 
+  // --- LÓGICA DE CARRITO PRO ---
+  const agregarAlCarrito = (producto) => {
+    setCarrito(prev => {
+      const existe = prev.find(item => item.id === producto.id);
+      if (existe) {
+        return prev.map(item => 
+          item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item
+        );
+      }
+      return [...prev, { ...producto, cantidad: 1 }];
+    });
+  };
+
+  const restarDelCarrito = (id) => {
+    setCarrito(prev => {
+      const item = prev.find(i => i.id === id);
+      if (item?.cantidad > 1) {
+        return prev.map(i => i.id === id ? { ...i, cantidad: i.cantidad - 1 } : i);
+      }
+      return prev.filter(i => i.id !== id);
+    });
+  };
+
+  const obtenerCantidad = (id) => {
+    return carrito.find(item => item.id === id)?.cantidad || 0;
+  };
+
+  // --- API CALLS ---
   const obtenerProductos = useCallback(async (silencioso = false) => {
     if (!token) return;
     try {
@@ -46,11 +87,8 @@ function App() {
         }));
         setLista(dataLimpia);
       }
-    } catch (err) {
-      console.error("Error de sincronización");
-    } finally {
-      setCargando(false);
-    }
+    } catch (err) { console.error("Error de sincronización"); } 
+    finally { setCargando(false); }
   }, [token]);
 
   useEffect(() => {
@@ -127,21 +165,14 @@ function App() {
                     id: String(p.id),
                     title: p.nombre, 
                     unit_price: Number(p.precio_actualizado), 
-                    quantity: 1
+                    quantity: p.cantidad
                 }))
             })
         });
         const data = await res.json();
-        if (data.init_point) {
-            window.location.href = data.init_point;
-        } else {
-            alert("Error al generar el pago.");
-        }
-    } catch (err) { 
-        alert("Error al conectar con Mercado Pago"); 
-    } finally { 
-        setCargando(false); 
-    }
+        if (data.init_point) window.location.href = data.init_point;
+    } catch (err) { alert("Error al conectar con Mercado Pago"); } 
+    finally { setCargando(false); }
   };
 
   if (!token) {
@@ -160,7 +191,6 @@ function App() {
 
   return (
     <div className="admin-layout">
-      {/* Overlay para cerrar el menú al tocar fuera en móvil */}
       {menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)}></div>}
 
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
@@ -177,11 +207,14 @@ function App() {
         
         <div className="cart-card">
           <p className="cart-label">VENTA ACTUAL</p>
-          <div className="cart-row"><span>Items:</span><b>{carrito.length}</b></div>
+          <div className="cart-row">
+            <span>Items:</span>
+            <b>{carrito.reduce((acc, p) => acc + p.cantidad, 0)}</b>
+          </div>
           <div className="cart-row">
             <span>Total:</span>
             <b className="total-price">
-              ${carrito.reduce((acc, p) => acc + Number(p.precio_actualizado || 0), 0).toLocaleString()}
+              ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
             </b>
           </div>
           <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
@@ -213,12 +246,13 @@ function App() {
         </header>
 
         {view === 'inventario' ? (
-          <section className="p-4">
+          <section style={{padding: '1.5rem'}}>
             <div className="action-bar">
               <input 
                 type="text" 
                 placeholder="🔍 Buscar por nombre o EAN..." 
                 className="search-input" 
+                value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)} 
               />
               <input type="file" ref={fileInputRef} hidden onChange={manejarEscaneo} accept="image/*" />
@@ -230,8 +264,8 @@ function App() {
                 <thead>
                   <tr>
                     <th>Producto</th>
-                    <th>Precio (Editar)</th>
-                    <th>Acción</th>
+                    <th>Precio</th>
+                    <th style={{textAlign: 'center'}}>Cantidad</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -264,13 +298,21 @@ function App() {
                         )}
                       </td>
                       <td className="td-accion">
-                        <button className="btn-add" onClick={() => setCarrito([...carrito, p])}>+</button>
+                        <div className="quantity-controls">
+                          <button className="btn-qty" onClick={() => restarDelCarrito(p.id)}>-</button>
+                          <span className="qty-number">{obtenerCantidad(p.id)}</span>
+                          <button className="btn-qty plus" onClick={() => agregarAlCarrito(p)}>+</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {lista.length === 0 && !cargando && <p style={{padding: '2rem', textAlign: 'center', color: '#64748b'}}>No hay productos.</p>}
+              {lista.length === 0 && !cargando && (
+                <div className="empty-state">
+                  <p>No hay productos disponibles.</p>
+                </div>
+              )}
             </div>
           </section>
         ) : (
