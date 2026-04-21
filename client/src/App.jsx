@@ -115,25 +115,25 @@ function App() {
   };
 
   // --- LÓGICA DE PRODUCTOS ---
-  const obtenerProductos = useCallback(async (silencioso = false) => {
-    if (!token) return;
+  const obtenerProductos = async () => {
+    const token = localStorage.getItem('token'); // O donde lo guardes
+    const email = localStorage.getItem('userEmail');
+
     try {
-      if (!silencioso) setCargando(true);
-      const res = await fetch(`${API_URL}/productos`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }); 
-      if (res.status === 401 || res.status === 403) return logout();
-      const resData = await res.json();
-      
-      // Ajuste para el nuevo formato del controlador que envía { productos, alertasFaltantes, count }
-      const productosRecibidos = resData.productos || resData.data || resData;
-      
-      if (Array.isArray(productosRecibidos)) {
-        setLista(productosRecibidos);
-      }
-    } catch (err) { console.error("Error de sincronización"); } 
-    finally { setCargando(false); }
-  }, [token]);
+        const res = await fetch(`${API_URL}/api/productos`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'x-user-email': email, // Mandamos ambos por seguridad
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await res.json();
+        // Ojo: ahora tu controller devuelve { productos: [...] }, no la lista sola.
+        setLista(data.productos || []); 
+    } catch (error) {
+        console.error("Error al pedir productos", error);
+    }
+};
 
   useEffect(() => {
     if (token) obtenerProductos();
