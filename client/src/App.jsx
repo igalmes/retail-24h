@@ -15,6 +15,7 @@ function App() {
   const [view, setView] = useState('inventario');
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [botConectado, setBotConectado] = useState(false);
   
   const [carrito, setCarrito] = useState(() => {
     const guardado = localStorage.getItem('carrito');
@@ -288,6 +289,18 @@ function App() {
         <nav className="sidebar-nav">
           <button className={`nav-btn ${view === 'inventario' ? 'active' : ''}`} onClick={() => { setView('inventario'); setMenuAbierto(false); }}>📦 Inventario</button>
           <button className={`nav-btn ${view === 'stock' ? 'active' : ''}`} onClick={() => { setView('stock'); setMenuAbierto(false); }}>📉 Control Stock</button>
+          
+          <div style={{ margin: '10px 0', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+            <p style={{ fontSize: '0.7rem', color: '#64748b', paddingLeft: '15px', marginBottom: '5px' }}>CONECTIVIDAD</p>
+            <button 
+              className="nav-btn" 
+              style={{ color: '#25D366' }}
+              onClick={() => window.open(`${API_URL.replace('/api', '')}/qr`, '_blank')}
+            >
+              💬 Vincular WhatsApp
+            </button>
+          </div>
+
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
           <button className={`nav-btn ${view === 'empleados' ? 'active' : ''}`} onClick={() => { setView('empleados'); setMenuAbierto(false); }}>🛠 Empleados</button>
         </nav>
