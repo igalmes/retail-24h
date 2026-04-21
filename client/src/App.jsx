@@ -24,11 +24,50 @@ function App() {
   const [editando, setEditando] = useState(null); 
   const [menuAbierto, setMenuAbierto] = useState(false);
   const fileInputRef = useRef(null);
-  const [configComercio] = useState({ nombre: "Retail 24h AI" });
+  const logoInputRef = useRef(null);
 
+  // --- ESTADOS PARA PERSONALIZACIÓN ---
+  const [configComercio, setConfigComercio] = useState(() => {
+    const guardado = localStorage.getItem('configComercio');
+    return guardado ? JSON.parse(guardado) : { 
+      nombre: "Retail 24h AI", 
+      logo: "https://via.placeholder.com/40" 
+    };
+  });
+  const [editandoNombre, setEditandoNombre] = useState(false);
+
+  // 1. Efecto para persistir carrito
   useEffect(() => {
     localStorage.setItem('carrito', JSON.stringify(carrito));
   }, [carrito]);
+
+  // 2. Efecto para persistir config localmente (fallback rápido)
+  useEffect(() => {
+    localStorage.setItem('configComercio', JSON.stringify(configComercio));
+  }, [configComercio]);
+
+  // 3. NUEVO: Efecto para cargar Configuración desde el Servidor
+  useEffect(() => {
+    const cargarConfigDeNube = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_URL}/config`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Mapeamos los nombres de tu modelo Configuracion.js
+          if (data.nombreEmpresa || data.logoUrl) {
+            setConfigComercio({
+              nombre: data.nombreEmpresa || "Retail 24h AI",
+              logo: data.logoUrl || "https://via.placeholder.com/40"
+            });
+          }
+        }
+      } catch (err) { console.error("Error cargando configuración remota"); }
+    };
+    cargarConfigDeNube();
+  }, [token]);
 
   const logout = () => {
     setUser(null);
@@ -37,6 +76,54 @@ function App() {
     localStorage.removeItem('carrito');
     setCarrito([]);
   };
+
+  // --- FUNCIONES DE PERSONALIZACIÓN (AHORA CON GUARDADO EN RED) ---
+  
+  const guardarConfigEnNube = async (nuevosDatos) => {
+    if (!token) return;
+    try {
+      // Unimos lo que ya tenemos con lo nuevo
+      const payload = {
+        nombreEmpresa: nuevosDatos.nombre || configComercio.nombre,
+        logoUrl: nuevosDatos.logo || configComercio.logo
+      };
+
+      const res = await fetch(`${API_URL}/config`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        setConfigComercio(prev => ({ ...prev, ...nuevosDatos }));
+      }
+    } catch (err) { console.error("Error al guardar en nube"); }
+  };
+
+  const cambiarNombreEmpresa = (nuevoNombre) => {
+    if (!nuevoNombre || nuevoNombre === configComercio.nombre) {
+        setEditandoNombre(false);
+        return;
+    }
+    guardarConfigEnNube({ nombre: nuevoNombre });
+    setEditandoNombre(false);
+  };
+
+  const manejarCambioLogo = (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      guardarConfigEnNube({ logo: reader.result });
+    };
+    reader.readAsDataURL(archivo);
+  };
+
+  // --- LÓGICA DE PRODUCTOS ---
 
   const agregarAlCarrito = (producto) => {
     setCarrito(prev => {
@@ -175,6 +262,10 @@ function App() {
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <div className="login-screen">
           <div className="login-box">
+            <div 
+              className="login-logo" 
+              style={{backgroundImage: `url(${configComercio.logo})`, width: '80px', height: '80px', margin: '0 auto 20px', backgroundSize: 'cover', borderRadius: '12px'}}
+            ></div>
             <h1>{configComercio.nombre}</h1>
             <p>Gestión Inteligente de Inventario</p>
             <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => {}} useOneTap />
@@ -190,7 +281,8 @@ function App() {
 
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <span className="brand-dot"></span> {configComercio.nombre}
+          <div className="mini-logo" style={{backgroundImage: `url(${configComercio.logo})`}}></div>
+          {configComercio.nombre}
         </div>
 
         <nav className="sidebar-nav">
@@ -229,18 +321,35 @@ function App() {
             <button className="menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
               {menuAbierto ? '✕' : '☰'}
             </button>
-            <div>
-              <h2 style={{margin: 0}}>{view.charAt(0).toUpperCase() + view.slice(1)}</h2>
+            <div className="brand-editable">
+              {editandoNombre ? (
+                <input 
+                  autoFocus
+                  className="edit-brand-input"
+                  defaultValue={configComercio.nombre}
+                  onBlur={(e) => cambiarNombreEmpresa(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && cambiarNombreEmpresa(e.target.value)}
+                />
+              ) : (
+                <h2 style={{margin: 0, cursor: 'pointer'}} onClick={() => setEditandoNombre(true)}>
+                  {configComercio.nombre} <small style={{fontSize: '0.6em'}}>✎</small>
+                </h2>
+              )}
               <p className="d-none-mobile" style={{margin: 0, color: '#64748b', fontSize: '0.8rem'}}>Retail 24h AI v2.0</p>
             </div>
           </div>
           <div className="user-badge">
             <span className="d-none-mobile">{user?.nombre || 'Admin'}</span>
-            <div className="avatar" style={{backgroundImage: `url(${user?.foto || 'https://via.placeholder.com/40'})`}}></div>
+            <input type="file" ref={logoInputRef} hidden accept="image/*" onChange={manejarCambioLogo} />
+            <div 
+              className="avatar company-logo-trigger" 
+              title="Cambiar logo de empresa"
+              style={{backgroundImage: `url(${configComercio.logo})`, cursor: 'pointer', border: '2px solid var(--primary)'}}
+              onClick={() => logoInputRef.current.click()}
+            ></div>
           </div>
         </header>
 
-        {/* --- LA BARRA DE CARGA SE INYECTA AQUÍ --- */}
         {cargando && (
           <div className="loading-bar-container">
             <div className="loading-bar-fill"></div>

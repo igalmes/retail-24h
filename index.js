@@ -8,6 +8,7 @@ const whatsappBot = require('./services/whatsappService');
 const authRoutes = require('./routes/authRoutes');
 const verifyToken = require('./middleware/auth');
 const pagoRoutes = require('./routes/pagoRoutes');
+const configRoutes = require('./routes/configRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -37,6 +38,7 @@ app.use('/api/auth', authRoutes);
 // Importante: verifyToken protege el acceso a productos y pagos
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, pagoRoutes); 
+app.use('/api/config', verifyToken, configRoutes);
 
 // 4. RUTA PARA EL QR
 app.get('/qr', (req, res) => {
