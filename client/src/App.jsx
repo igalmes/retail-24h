@@ -12,11 +12,12 @@ function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [lista, setLista] = useState([]);
-  const [view, setView] = useState('inventario'); // Control de navegación
+  const [view, setView] = useState('inventario');
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [carrito, setCarrito] = useState([]);
   const [editando, setEditando] = useState(null); 
+  const [menuAbierto, setMenuAbierto] = useState(false); // Estado para móvil
   const fileInputRef = useRef(null);
 
   const [configComercio] = useState({ nombre: "Retail 24h AI" });
@@ -39,7 +40,6 @@ function App() {
       const productosRecibidos = resData.data || resData;
       
       if (Array.isArray(productosRecibidos)) {
-        // Mapeo preventivo para evitar NaN en el renderizado
         const dataLimpia = productosRecibidos.map(p => ({
           ...p,
           precio_actualizado: Number(p.precio_actualizado || p.precio || 0)
@@ -123,7 +123,6 @@ function App() {
                 'Authorization': `Bearer ${token}` 
             },
             body: JSON.stringify({ 
-                // IMPORTANTE: Mercado Pago usa 'title' y 'unit_price' (como número)
                 items: carrito.map(p => ({
                     id: String(p.id),
                     title: p.nombre, 
@@ -136,14 +135,14 @@ function App() {
         if (data.init_point) {
             window.location.href = data.init_point;
         } else {
-            alert("El servidor no devolvió un punto de inicio de pago.");
+            alert("Error al generar el pago.");
         }
     } catch (err) { 
         alert("Error al conectar con Mercado Pago"); 
     } finally { 
         setCargando(false); 
     }
-};
+  };
 
   if (!token) {
     return (
@@ -161,16 +160,19 @@ function App() {
 
   return (
     <div className="admin-layout">
-      <aside className="sidebar">
+      {/* Overlay para cerrar el menú al tocar fuera en móvil */}
+      {menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)}></div>}
+
+      <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <span className="brand-dot"></span> {configComercio.nombre}
         </div>
 
-        <nav className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-          <button className={`nav-btn ${view === 'inventario' ? 'active' : ''}`} onClick={() => setView('inventario')}>📦 Inventario</button>
-          <button className={`nav-btn ${view === 'stock' ? 'active' : ''}`} onClick={() => setView('stock')}>📉 Control Stock</button>
-          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => setView('clientes')}>👥 Clientes</button>
-          <button className={`nav-btn ${view === 'empleados' ? 'active' : ''}`} onClick={() => setView('empleados')}>🛠 Empleados</button>
+        <nav className="sidebar-nav">
+          <button className={`nav-btn ${view === 'inventario' ? 'active' : ''}`} onClick={() => { setView('inventario'); setMenuAbierto(false); }}>📦 Inventario</button>
+          <button className={`nav-btn ${view === 'stock' ? 'active' : ''}`} onClick={() => { setView('stock'); setMenuAbierto(false); }}>📉 Control Stock</button>
+          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
+          <button className={`nav-btn ${view === 'empleados' ? 'active' : ''}`} onClick={() => { setView('empleados'); setMenuAbierto(false); }}>🛠 Empleados</button>
         </nav>
         
         <div className="cart-card">
@@ -195,9 +197,14 @@ function App() {
 
       <main className="content">
         <header className="content-header">
-          <div>
-            <h2 style={{margin: 0}}>{view.charAt(0).toUpperCase() + view.slice(1)}</h2>
-            <p className="d-none-mobile" style={{margin: 0, color: '#64748b', fontSize: '0.8rem'}}>Retail 24h AI v2.0</p>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <button className="menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
+              {menuAbierto ? '✕' : '☰'}
+            </button>
+            <div>
+              <h2 style={{margin: 0}}>{view.charAt(0).toUpperCase() + view.slice(1)}</h2>
+              <p className="d-none-mobile" style={{margin: 0, color: '#64748b', fontSize: '0.8rem'}}>Retail 24h AI v2.0</p>
+            </div>
           </div>
           <div className="user-badge">
             <span className="d-none-mobile">{user?.nombre || 'Admin'}</span>
@@ -233,14 +240,14 @@ function App() {
                     p.codigo_barras?.includes(busqueda)
                   ).map((p) => (
                     <tr key={p.id}>
-                      <td style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                      <td className="td-producto">
                         <img src={p.fotoUrl || p.imagen_url || 'https://via.placeholder.com/50'} className="prod-img" alt="" />
                         <div>
-                          <b style={{display: 'block'}}>{p.nombre}</b>
-                          <small style={{color: '#64748b'}}>EAN: {p.codigo_barras}</small>
+                          <b className="p-name">{p.nombre}</b>
+                          <small className="p-ean">EAN: {p.codigo_barras}</small>
                         </div>
                       </td>
-                      <td>
+                      <td className="td-precio">
                         {editando === p.id ? (
                           <input 
                             type="number" 
@@ -256,7 +263,7 @@ function App() {
                           </b>
                         )}
                       </td>
-                      <td>
+                      <td className="td-accion">
                         <button className="btn-add" onClick={() => setCarrito([...carrito, p])}>+</button>
                       </td>
                     </tr>
