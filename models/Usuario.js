@@ -17,17 +17,26 @@ const Usuario = sequelize.define('Usuario', {
         allowNull: false 
     },
     rol: { 
-        type: DataTypes.ENUM('admin', 'empleado'), 
+        // Actualizado para incluir socio y cliente
+        type: DataTypes.ENUM('admin', 'empleado', 'socio', 'cliente'), 
         defaultValue: 'admin' 
     },
-    // --- CAMPOS DE CAPITALIZACIÓN Y SAAS ---
+    // NUEVO: Relación con la tabla Comercios
+    comercioId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'Comercios',
+            key: 'id'
+        }
+    },
     plan: {
         type: DataTypes.ENUM('free', 'premium', 'pro'),
         defaultValue: 'free'
     },
     limiteProductos: {
         type: DataTypes.INTEGER,
-        defaultValue: 15 // Límite inicial para que prueben la IA
+        defaultValue: 15
     },
     productosCargados: {
         type: DataTypes.INTEGER,
@@ -38,15 +47,17 @@ const Usuario = sequelize.define('Usuario', {
         defaultValue: 'activo'
     }
 }, {
+    tableName: 'Usuarios', // Aseguramos que coincida con tu DB
     hooks: {
         beforeCreate: async (user) => {
-            const salt = await bcrypt.genSalt(10);
-            user.password = await bcrypt.hash(user.password, salt);
+            if (user.password) {
+                const salt = await bcrypt.genSalt(10);
+                user.password = await bcrypt.hash(user.password, salt);
+            }
         }
     }
 });
 
-// Método para comparar contraseñas al loguearse
 Usuario.prototype.validPassword = async function(password) {
     return await bcrypt.compare(password, this.password);
 };
