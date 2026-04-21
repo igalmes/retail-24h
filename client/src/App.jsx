@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import './App.css';
+import Inventario from './components/Inventario';
 
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:4000/api' 
@@ -12,10 +13,9 @@ function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [lista, setLista] = useState([]);
-  const [view, setView] = useState('inventario');
+  const [view, setView] = useState('inventario_pro'); // Vista por defecto cambiada a la Pro
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
-  const [botConectado, setBotConectado] = useState(false);
   
   const [carrito, setCarrito] = useState(() => {
     const guardado = localStorage.getItem('carrito');
@@ -24,7 +24,6 @@ function App() {
 
   const [editando, setEditando] = useState(null); 
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const fileInputRef = useRef(null);
   const logoInputRef = useRef(null);
 
   // --- ESTADOS PARA PERSONALIZACIÓN ---
@@ -37,17 +36,15 @@ function App() {
   });
   const [editandoNombre, setEditandoNombre] = useState(false);
 
-  // 1. Efecto para persistir carrito
   useEffect(() => {
     localStorage.setItem('carrito', JSON.stringify(carrito));
   }, [carrito]);
 
-  // 2. Efecto para persistir config localmente (fallback rápido)
   useEffect(() => {
     localStorage.setItem('configComercio', JSON.stringify(configComercio));
   }, [configComercio]);
 
-  // 3. NUEVO: Efecto para cargar Configuración desde el Servidor
+  // Carga de Configuración desde el Servidor
   useEffect(() => {
     const cargarConfigDeNube = async () => {
       if (!token) return;
@@ -57,7 +54,6 @@ function App() {
         });
         if (res.ok) {
           const data = await res.json();
-          // Mapeamos los nombres de tu modelo Configuracion.js
           if (data.nombreEmpresa || data.logoUrl) {
             setConfigComercio({
               nombre: data.nombreEmpresa || "Retail 24h AI",
@@ -78,17 +74,13 @@ function App() {
     setCarrito([]);
   };
 
-  // --- FUNCIONES DE PERSONALIZACIÓN (AHORA CON GUARDADO EN RED) ---
-  
   const guardarConfigEnNube = async (nuevosDatos) => {
     if (!token) return;
     try {
-      // Unimos lo que ya tenemos con lo nuevo
       const payload = {
         nombreEmpresa: nuevosDatos.nombre || configComercio.nombre,
         logoUrl: nuevosDatos.logo || configComercio.logo
       };
-
       const res = await fetch(`${API_URL}/config`, {
         method: 'PUT',
         headers: { 
@@ -97,7 +89,6 @@ function App() {
         },
         body: JSON.stringify(payload)
       });
-      
       if (res.ok) {
         setConfigComercio(prev => ({ ...prev, ...nuevosDatos }));
       }
@@ -116,7 +107,6 @@ function App() {
   const manejarCambioLogo = (e) => {
     const archivo = e.target.files[0];
     if (!archivo) return;
-    
     const reader = new FileReader();
     reader.onloadend = () => {
       guardarConfigEnNube({ logo: reader.result });
@@ -125,33 +115,6 @@ function App() {
   };
 
   // --- LÓGICA DE PRODUCTOS ---
-
-  const agregarAlCarrito = (producto) => {
-    setCarrito(prev => {
-      const existe = prev.find(item => item.id === producto.id);
-      if (existe) {
-        return prev.map(item => 
-          item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item
-        );
-      }
-      return [...prev, { ...producto, cantidad: 1 }];
-    });
-  };
-
-  const restarDelCarrito = (id) => {
-    setCarrito(prev => {
-      const item = prev.find(i => i.id === id);
-      if (item?.cantidad > 1) {
-        return prev.map(i => i.id === id ? { ...i, cantidad: i.cantidad - 1 } : i);
-      }
-      return prev.filter(i => i.id !== id);
-    });
-  };
-
-  const obtenerCantidad = (id) => {
-    return carrito.find(item => item.id === id)?.cantidad || 0;
-  };
-
   const obtenerProductos = useCallback(async (silencioso = false) => {
     if (!token) return;
     try {
@@ -161,14 +124,12 @@ function App() {
       }); 
       if (res.status === 401 || res.status === 403) return logout();
       const resData = await res.json();
-      const productosRecibidos = resData.data || resData;
+      
+      // Ajuste para el nuevo formato del controlador que envía { productos, alertasFaltantes, count }
+      const productosRecibidos = resData.productos || resData.data || resData;
       
       if (Array.isArray(productosRecibidos)) {
-        const dataLimpia = productosRecibidos.map(p => ({
-          ...p,
-          precio_actualizado: Number(p.precio_actualizado || p.precio || 0)
-        }));
-        setLista(dataLimpia);
+        setLista(productosRecibidos);
       }
     } catch (err) { console.error("Error de sincronización"); } 
     finally { setCargando(false); }
@@ -194,43 +155,6 @@ function App() {
       }
     } catch (err) { alert("Error de conexión"); } 
     finally { setCargando(false); }
-  };
-
-  const manejarEscaneo = async (e) => {
-    const archivo = e.target.files[0];
-    if (!archivo || !token) return;
-    const formData = new FormData();
-    formData.append('imagen', archivo);
-    try {
-      setCargando(true);
-      const res = await fetch(`${API_URL}/productos/detectar`, { 
-        method: 'POST', 
-        body: formData,
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) await obtenerProductos();
-    } catch (err) { console.error("Error en escaneo"); } 
-    finally { 
-      setCargando(false); 
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const actualizarPrecio = async (id, nuevoPrecio) => {
-    try {
-      const res = await fetch(`${API_URL}/productos/${id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ precio_actualizado: Number(nuevoPrecio) })
-      });
-      if (res.ok) {
-        setLista(lista.map(p => p.id === id ? { ...p, precio_actualizado: Number(nuevoPrecio) } : p));
-        setEditando(null);
-      }
-    } catch (err) { alert("Error al actualizar precio"); }
   };
 
   const manejarPago = async () => {
@@ -287,42 +211,24 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
-          <button className={`nav-btn ${view === 'inventario' ? 'active' : ''}`} onClick={() => { setView('inventario'); setMenuAbierto(false); }}>📦 Inventario</button>
-          <button className={`nav-btn ${view === 'stock' ? 'active' : ''}`} onClick={() => { setView('stock'); setMenuAbierto(false); }}>📉 Control Stock</button>
+          {/* BOTÓN PARA EL NUEVO MÓDULO */}
+          <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario PRO</button>
+          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
           
           <div style={{ margin: '10px 0', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
-            <p style={{ fontSize: '0.7rem', color: '#64748b', paddingLeft: '15px', marginBottom: '5px' }}>CONECTIVIDAD</p>
-            <button 
-              className="nav-btn" 
-              style={{ color: '#25D366' }}
-              onClick={() => window.open(`${API_URL.replace('/api', '')}/qr`, '_blank')}
-            >
-              💬 Vincular WhatsApp
-            </button>
+            <button className="nav-btn" style={{ color: '#25D366' }} onClick={() => window.open(`${API_URL.replace('/api', '')}/qr`, '_blank')}>💬 WhatsApp</button>
           </div>
-
-          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
-          <button className={`nav-btn ${view === 'empleados' ? 'active' : ''}`} onClick={() => { setView('empleados'); setMenuAbierto(false); }}>🛠 Empleados</button>
         </nav>
         
+        {/* CARRITO SIEMPRE VISIBLE PARA VENTAS RÁPIDAS */}
         <div className="cart-card">
-          <p className="cart-label">VENTA ACTUAL</p>
-          <div className="cart-row">
-            <span>Items:</span>
-            <b>{carrito.reduce((acc, p) => acc + p.cantidad, 0)}</b>
-          </div>
-          <div className="cart-row">
-            <span>Total:</span>
-            <b className="total-price">
-              ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
-            </b>
-          </div>
+          <p className="cart-label">TOTAL VENTA</p>
+          <b className="total-price">
+            ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
+          </b>
           <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
-            {cargando ? 'PROCESANDO...' : 'PAGAR'}
+            {cargando ? '...' : 'PAGAR'}
           </button>
-          {carrito.length > 0 && (
-            <button className="btn-clear" onClick={() => setCarrito([])}>Vaciar</button>
-          )}
         </div>
         
         <button className="btn-logout" onClick={logout}>Cerrar Sesión</button>
@@ -336,19 +242,12 @@ function App() {
             </button>
             <div className="brand-editable">
               {editandoNombre ? (
-                <input 
-                  autoFocus
-                  className="edit-brand-input"
-                  defaultValue={configComercio.nombre}
-                  onBlur={(e) => cambiarNombreEmpresa(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && cambiarNombreEmpresa(e.target.value)}
-                />
+                <input autoFocus className="edit-brand-input" defaultValue={configComercio.nombre} onBlur={(e) => cambiarNombreEmpresa(e.target.value)} />
               ) : (
                 <h2 style={{margin: 0, cursor: 'pointer'}} onClick={() => setEditandoNombre(true)}>
                   {configComercio.nombre} <small style={{fontSize: '0.6em'}}>✎</small>
                 </h2>
               )}
-              <p className="d-none-mobile" style={{margin: 0, color: '#64748b', fontSize: '0.8rem'}}>Retail 24h AI v2.0</p>
             </div>
           </div>
           <div className="user-badge">
@@ -356,93 +255,21 @@ function App() {
             <input type="file" ref={logoInputRef} hidden accept="image/*" onChange={manejarCambioLogo} />
             <div 
               className="avatar company-logo-trigger" 
-              title="Cambiar logo de empresa"
-              style={{backgroundImage: `url(${configComercio.logo})`, cursor: 'pointer', border: '2px solid var(--primary)'}}
+              style={{backgroundImage: `url(${configComercio.logo})`, cursor: 'pointer'}}
               onClick={() => logoInputRef.current.click()}
             ></div>
           </div>
         </header>
 
-        {cargando && (
-          <div className="loading-bar-container">
-            <div className="loading-bar-fill"></div>
-          </div>
-        )}
+        {cargando && <div className="loading-bar-container"><div className="loading-bar-fill"></div></div>}
 
-        {view === 'inventario' ? (
-          <section style={{padding: '1.5rem'}}>
-            <div className="action-bar">
-              <input 
-                type="text" 
-                placeholder="🔍 Buscar por nombre o EAN..." 
-                className="search-input" 
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)} 
-              />
-              <input type="file" ref={fileInputRef} hidden onChange={manejarEscaneo} accept="image/*" />
-              <button className="btn-scan" onClick={() => fileInputRef.current.click()}>📸 ESCANEAR IA</button>
-            </div>
-
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>Precio</th>
-                    <th style={{textAlign: 'center'}}>Cantidad</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lista.filter(p => 
-                    p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
-                    p.codigo_barras?.includes(busqueda)
-                  ).map((p) => (
-                    <tr key={p.id}>
-                      <td className="td-producto">
-                        <img src={p.fotoUrl || p.imagen_url || 'https://via.placeholder.com/50'} className="prod-img" alt="" />
-                        <div>
-                          <b className="p-name">{p.nombre}</b>
-                          <small className="p-ean">EAN: {p.codigo_barras}</small>
-                        </div>
-                      </td>
-                      <td className="td-precio">
-                        {editando === p.id ? (
-                          <input 
-                            type="number" 
-                            className="edit-price-input"
-                            defaultValue={p.precio_actualizado}
-                            onBlur={(e) => actualizarPrecio(p.id, e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && actualizarPrecio(p.id, e.target.value)}
-                            autoFocus
-                          />
-                        ) : (
-                          <b className="price-tag" onClick={() => setEditando(p.id)}>
-                            ${Number(p.precio_actualizado || 0).toLocaleString()} ✎
-                          </b>
-                        )}
-                      </td>
-                      <td className="td-accion">
-                        <div className="quantity-controls">
-                          <button className="btn-qty" onClick={() => restarDelCarrito(p.id)}>-</button>
-                          <span className="qty-number">{obtenerCantidad(p.id)}</span>
-                          <button className="btn-qty plus" onClick={() => agregarAlCarrito(p)}>+</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {lista.length === 0 && !cargando && (
-                <div className="empty-state">
-                  <p>No hay productos disponibles.</p>
-                </div>
-              )}
-            </div>
-          </section>
+        {/* --- NAVEGACIÓN DE VISTAS --- */}
+        {view === 'inventario_pro' ? (
+          <Inventario token={token} API_URL={API_URL} refreshList={obtenerProductos} />
         ) : (
           <div className="placeholder-module">
             <h3>Módulo de {view}</h3>
-            <p>Sincronizando registros con la nube...</p>
+            <p>Próximamente disponible para {configComercio.nombre}</p>
           </div>
         )}
       </main>
