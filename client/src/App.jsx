@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import './App.css';
-import Inventario from './components/Inventario';
+import Inventario from './Inventario';
 
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:4000/api' 
