@@ -16,8 +16,6 @@ function App() {
     logo: "https://via.placeholder.com/80"
   });
 
-  const fontTexto = { fontFamily: "'Inter', sans-serif" };
-
   const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
     : window.location.origin;
@@ -40,7 +38,6 @@ function App() {
     const tokenAct = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
     if (!tokenAct) return;
-
     try {
       const res = await fetch(`${API_URL}/api/productos`, {
         headers: {
@@ -112,8 +109,8 @@ function App() {
         <div className="login-screen">
           <div className="login-box">
             <div className="login-logo" style={{ backgroundImage: `url(${configComercio.logo})`, width: '80px', height: '80px', margin: '0 auto 20px', backgroundSize: 'cover', borderRadius: '12px' }}></div>
-            <h1>{configComercio.nombre}</h1>
-            <p>Gestión Inteligente de Inventario</p>
+            <h1 style={{ fontWeight: '800', color: '#1a1a1a' }}>{configComercio.nombre}</h1>
+            <p style={{ fontWeight: '600', color: '#64748b' }}>Gestión Inteligente de Inventario</p>
             <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => { }} useOneTap />
           </div>
         </div>
@@ -122,47 +119,58 @@ function App() {
   }
 
   return (
-    <div className="admin-layout" style={fontTexto}>
+    <div className="admin-layout">
       {menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)}></div>}
 
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="mini-logo" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
-          {configComercio.nombre}
+          <span style={{ fontWeight: '800' }}>{configComercio.nombre}</span>
         </div>
 
         <nav className="sidebar-nav">
-          <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario PRO</button>
-          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
-          <div style={{ margin: '10px 0', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
-            <button className="nav-btn" style={{ color: '#25D366' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>💬 WhatsApp</button>
+          <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>
+            🚀 <span style={{ fontWeight: '700' }}>Inventario PRO</span>
+          </button>
+          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>
+            👥 <span style={{ fontWeight: '700' }}>Clientes</span>
+          </button>
+          <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+            <button className="nav-btn" style={{ color: '#22c55e', fontWeight: '700' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>💬 WhatsApp</button>
           </div>
         </nav>
 
-        {/* CARRITO REPARADO Y MEJORADO */}
+        {/* CARRITO MEJORADO: ALTO CONTRASTE Y ELIMINAR ITEM */}
         <div className="cart-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <p className="cart-label" style={{ margin: 0, fontWeight: '800', color: '#1e293b' }}>CARRITO</p>
+            <p className="cart-label">CARRITO</p>
             {carrito.length > 0 && (
-              <button onClick={vaciarCarrito} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>VACIAR</button>
+              <button onClick={vaciarCarrito} className="btn-clear-all">VACIAR</button>
             )}
           </div>
           
-          <div className="cart-items-list" style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '10px' }}>
+          <div className="cart-items-list">
             {carrito.map(item => (
-              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', marginBottom: '6px', background: '#f1f5f9', padding: '8px', borderRadius: '6px' }}>
-                <span style={{ fontWeight: '800', color: '#0f172a' }}>{item.cantidad}x {item.nombre}</span>
-                <button onClick={() => eliminarDelCarrito(item.id)} style={{ border: 'none', background: '#cbd5e1', color: 'white', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              <div key={item.id} className="cart-item-row">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="cart-item-name">{item.cantidad}x {item.nombre}</span>
+                  <span className="cart-item-sub">Sub: ${(item.precio_actualizado * item.cantidad).toLocaleString()}</span>
+                </div>
+                {/* BOTÓN ELIMINAR ITEM INDIVIDUAL */}
+                <button 
+                  onClick={() => eliminarDelCarrito(item.id)} 
+                  className="btn-remove-item"
+                >✕</button>
               </div>
             ))}
           </div>
 
-          <p className="cart-label" style={{ fontWeight: '800' }}>TOTAL VENTA</p>
-          <b className="total-price" style={{ fontFamily: "'Roboto Mono', monospace", fontWeight: '800', color: '#16a34a' }}>
+          <p className="cart-label" style={{ marginTop: '10px' }}>TOTAL VENTA</p>
+          <b className="total-price font-numeric">
             ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
           </b>
-          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ fontWeight: '800' }}>
-            {cargando ? '...' : 'PAGAR'}
+          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
+            {cargando ? '...' : 'PAGAR AHORA'}
           </button>
         </div>
 
@@ -175,30 +183,32 @@ function App() {
             <button className="menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
               {menuAbierto ? '✕' : '☰'}
             </button>
-            <h2 style={{ margin: 0, fontWeight: '800' }}>{configComercio.nombre}</h2>
+            <h2 style={{ margin: 0, fontWeight: '800', color: '#0f172a' }}>{configComercio.nombre}</h2>
           </div>
           <div className="user-badge">
-            <span className="d-none-mobile" style={{ fontWeight: '700' }}>{user?.nombre || 'Admin'}</span>
+            <span className="d-none-mobile" style={{ fontWeight: '700', color: '#1e293b' }}>{user?.nombre || 'Admin'}</span>
             <div className="avatar" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           </div>
         </header>
 
         {cargando && <div className="loading-bar-container"><div className="loading-bar-fill"></div></div>}
 
-        {view === 'inventario_pro' ? (
-          <Inventario 
-            token={token} 
-            API_URL={`${API_URL}/api`} 
-            refreshList={obtenerProductos}
-            carrito={carrito}
-            setCarrito={setCarrito}
-          />
-        ) : (
-          <div className="placeholder-module">
-            <h3>Módulo de {view}</h3>
-            <p>Próximamente disponible para {configComercio.nombre}</p>
-          </div>
-        )}
+        <div style={{ padding: '2rem' }}>
+          {view === 'inventario_pro' ? (
+            <Inventario 
+              token={token} 
+              API_URL={`${API_URL}/api`} 
+              refreshList={obtenerProductos}
+              carrito={carrito}
+              setCarrito={setCarrito}
+            />
+          ) : (
+            <div className="placeholder-module">
+              <h3 style={{ fontWeight: '800' }}>Módulo de {view}</h3>
+              <p>Próximamente disponible para {configComercio.nombre}</p>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
