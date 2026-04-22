@@ -32,7 +32,13 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
         
         REGLAS DE RESPUESTA:
         Responde ESTRICTAMENTE en JSON con este formato:
-        {"esPedido": boolean, "items": [], "mensaje": "Tu respuesta aquí"}
+        
+{
+  "esPedido": boolean,
+  "accion": "crear" | "eliminar" | "actualizar" | "ninguna",
+  "payload": { "nombre": "...", "cantidad": 0, "precio": 0 },
+  "mensaje": "Respuesta para el usuario"
+}
         `;
 
         const payload = {

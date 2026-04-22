@@ -1,6 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
-const QRCodeImage = require('qrcode'); // Necesitás instalarlo: npm install qrcode
+const QRCodeImage = require('qrcode'); 
 const path = require('path');
 const fs = require('fs');
 const Producto = require('../models/Producto');
@@ -60,43 +60,51 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('message_create', async (msg) => {
-    if (!msg.from.endsWith('@c.us')) return;
+        // Ignorar mensajes de grupos si se desea, o solo procesar chats individuales
+        if (!msg.from.endsWith('@c.us')) return;
 
-    const textoOriginal = msg.body.trim();
-    const textoLower = textoOriginal.toLowerCase();
-    const numeroWhatsApp = msg.from.replace('@c.us', '');
+        const textoOriginal = msg.body.trim();
+        const textoLower = textoOriginal.toLowerCase();
+        
+        // El trigger puede venir de otros o de vos mismo escribiendo "bot..."
+        const tieneTriggerIA = textoLower.startsWith('bot');
 
-    if (textoLower.startsWith('bot')) {
-        try {
-            // 1. Identificar al usuario en la DB
-            const usuario = await Usuario.findOne({ where: { telefono: numeroWhatsApp } });
-            const rol = usuario ? usuario.rol : 'cliente';
-            const nombre = usuario ? usuario.nombre : 'Cliente';
+        if (tieneTriggerIA) {
+            try {
+                // Obtenemos el número limpio (sin @c.us)
+                const numeroWhatsApp = msg.from.replace('@c.us', '');
+                
+                // 1. Identificar al usuario en la DB para conocer su ROL
+                const usuario = await Usuario.findOne({ where: { telefono: numeroWhatsApp } });
+                const rol = usuario ? usuario.rol : 'cliente';
+                const nombre = usuario ? usuario.nombre : 'Cliente';
 
-            const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
+                const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
+                if (!consultaIA) return;
 
-            // 2. ¿La consulta requiere datos de la DB? (Palabras clave)
-            let datosDB = [];
-            const disparadoresDB = ['stock', 'inventario', 'lista', 'precio', 'cuanto', 'hay', 'vende'];
-            
-            if (disparadoresDB.some(palabra => textoLower.includes(palabra))) {
-                datosDB = await Producto.findAll({
-                    attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
-                    raw: true
-                });
+                // 2. ¿La consulta requiere datos de la DB? (Basado en palabras clave)
+                let datosDB = [];
+                const disparadoresDB = ['stock', 'inventario', 'lista', 'precio', 'cuanto', 'hay', 'vende', 'resumen'];
+                
+                if (disparadoresDB.some(palabra => textoLower.includes(palabra))) {
+                    datosDB = await Producto.findAll({
+                        attributes: ['nombre', 'marca', 'precio_actualizado', 'stock_actual'],
+                        raw: true
+                    });
+                }
+
+                // 3. Procesar con Gemini pasando la data real, el rol y el nombre
+                const respuestaIA = await geminiService.procesarChatBot(consultaIA, rol, datosDB, nombre);
+                
+                // Respondemos con el mensaje procesado por la IA
+                await msg.reply(respuestaIA.mensaje);
+
+            } catch (error) {
+                console.error("❌ Error en flujo Bot:", error);
+                await msg.reply("Lo siento, hubo un error al consultar mi base de datos. 🤖");
             }
-
-            // 3. Procesar con Gemini pasando la data real
-            const respuestaIA = await geminiService.procesarChatBot(consultaIA, rol, datosDB, nombre);
-            
-            await msg.reply(respuestaIA.mensaje);
-
-        } catch (error) {
-            console.error("❌ Error en flujo Bot:", error);
-            await msg.reply("Lo siento, hubo un error al consultar mi base de datos. 🤖");
         }
-    }
-});
+    });
 
     try {
         await client.initialize();
