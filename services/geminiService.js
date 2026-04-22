@@ -2,7 +2,8 @@ const axios = require("axios");
 require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
-const MODELO = "gemini-2.5-flash";
+// Mantenemos el modelo flash para velocidad de respuesta en WhatsApp
+const MODELO = "gemini-2.0-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
 
 /**
@@ -15,7 +16,6 @@ const limpiarJSON = (texto) => {
 // Función para el Bot de WhatsApp (Texto)
 const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [], nombre = 'Usuario') => {
     try {
-        // Formateamos el inventario para que Gemini no se maree con JSON gigante
         const stockResumido = inventario.length > 0 
             ? inventario.map(p => `- ${p.nombre}: $${p.precio_actualizado} (Stock: ${p.stock_actual})`).join('\n')
             : "No hay productos cargados actualmente.";
@@ -23,22 +23,24 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
         const systemPrompt = `
         Eres el asistente de "Retail 24h AI". Estás hablando con ${nombre} (Rol: ${rol.toUpperCase()}).
         
-        INSTRUCCIONES DE ROL:
-        - Si es ADMIN o SOCIO: Tienes acceso total. Puedes dar reportes detallados y análisis de stock.
-        - Si es CLIENTE: Sé un vendedor amable. No des números exactos de stock, solo di si hay o no.
+        INSTRUCCIONES DE ACCIÓN:
+        - Si el rol es ADMIN o SOCIO y el usuario quiere:
+            1. AGREGAR/AÑADIR: Usa accion "crear". Extrae nombre, precio y cantidad.
+            2. ELIMINAR/BORRAR: Usa accion "eliminar". Identifica el nombre exacto del producto del inventario.
+            3. MODIFICAR/ACTUALIZAR: Usa accion "actualizar".
+        - Si no hay una instrucción clara de cambio, usa accion "ninguna".
         
-        INVENTARIO REAL DE LA DB:
+        INVENTARIO REAL ACTUAL:
         ${stockResumido}
         
         REGLAS DE RESPUESTA:
         Responde ESTRICTAMENTE en JSON con este formato:
-        
-{
-  "esPedido": boolean,
-  "accion": "crear" | "eliminar" | "actualizar" | "ninguna",
-  "payload": { "nombre": "...", "cantidad": 0, "precio": 0 },
-  "mensaje": "Respuesta para el usuario"
-}
+        {
+          "esPedido": boolean,
+          "accion": "crear" | "eliminar" | "actualizar" | "ninguna",
+          "payload": { "nombre": "nombre del producto", "cantidad": 0, "precio": 0 },
+          "mensaje": "Tu respuesta amable al usuario confirmando lo que hiciste o respondiendo su duda"
+        }
         `;
 
         const payload = {
@@ -54,13 +56,14 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
         console.error(`❌ Error Gemini:`, error.message);
-        return { esPedido: false, items: [], mensaje: "Hola! ¿En qué puedo ayudarte?" };
+        return { esPedido: false, accion: "ninguna", payload: {}, mensaje: "Hola! ¿En qué puedo ayudarte?" };
     }
 };
+
 // Función para analizar imágenes (Góndola)
 const analizarGondola = async (imageUrl) => {
     try {
-        console.log(">>> 4. Descargando imagen para Gemini...");
+        console.log(">>> Descargando imagen para Gemini...");
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Data = Buffer.from(responseImage.data).toString('base64');
 
@@ -73,17 +76,11 @@ const analizarGondola = async (imageUrl) => {
             }]
         };
 
-        console.log(`>>> 5. Llamando a Gemini API (${MODELO})...`);
         const result = await axios.post(url, payload);
-        
-        if (!result.data.candidates || result.data.candidates.length === 0) {
-            throw new Error("Gemini no devolvió candidatos.");
-        }
-
         const rawText = result.data.candidates[0].content.parts[0].text;
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
-        console.error(`❌ Error Gemini Imagen (${MODELO}):`, error.message);
+        console.error(`❌ Error Gemini Imagen:`, error.message);
         throw error;
     }
 };
