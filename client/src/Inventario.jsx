@@ -13,21 +13,25 @@ const Inventario = ({ token, API_URL, refreshList }) => {
 
     // 1. Cargar inventario
     const fetchProductos = async () => {
-        if (!token) return;
-        try {
-            const res = await axios.get(`${API_URL}/api/productos`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setProductos(res.data.productos || []);
+    if (!token) return;
+    try {
+        const res = await axios.get(`${API_URL}/api/productos`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        console.log("Respuesta completa:", res.data); // Mira esto en la consola del navegador (F12)
+        
+        // Validamos que existan los productos antes de setear
+        if (res.data && res.data.productos) {
+            setProductos(res.data.productos);
             setAlertas(res.data.alertasFaltantes || 0);
-        } catch (err) {
-            console.error("Error al cargar productos:", err.response?.data || err.message);
+        } else {
+            console.warn("El backend no devolvió el array 'productos'");
         }
-    };
-
-    useEffect(() => {
-        fetchProductos();
-    }, [token]);
+    } catch (err) {
+        console.error("Error en la petición:", err.response?.data || err.message);
+    }
+};
 
     // 2. Manejar la carga de imagen (IA)
     const handleIAUpload = async (e) => {
