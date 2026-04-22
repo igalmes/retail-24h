@@ -17,15 +17,17 @@ const Usuario = sequelize.define('Usuario', {
         allowNull: false 
     },
     rol: { 
+        // ENUM actualizado para soportar la jerarquía de tu sistema
         type: DataTypes.ENUM('admin', 'empleado', 'socio', 'cliente'), 
-        defaultValue: 'cliente' // Cambiado a cliente por seguridad
+        defaultValue: 'cliente' 
     },
     telefono: {
+        // Campo vital para que el bot de WhatsApp identifique al remitente
         type: DataTypes.STRING,
         unique: true,
         allowNull: true
     },
-    // NUEVO: Relación con la tabla Comercios
+    // Relación con la tabla Comercios para el multi-tenancy del SaaS
     comercioId: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -51,10 +53,17 @@ const Usuario = sequelize.define('Usuario', {
         defaultValue: 'activo'
     }
 }, {
-    tableName: 'Usuarios', // Aseguramos que coincida con tu DB
+    tableName: 'Usuarios', // Mantenemos coincidencia exacta con MySQL Workbench
     hooks: {
         beforeCreate: async (user) => {
             if (user.password) {
+                const salt = await bcrypt.genSalt(10);
+                user.password = await bcrypt.hash(user.password, salt);
+            }
+        },
+        // Agregamos beforeUpdate por si cambias la contraseña en el futuro
+        beforeUpdate: async (user) => {
+            if (user.changed('password')) {
                 const salt = await bcrypt.genSalt(10);
                 user.password = await bcrypt.hash(user.password, salt);
             }
@@ -62,6 +71,7 @@ const Usuario = sequelize.define('Usuario', {
     }
 });
 
+// Método para verificar la contraseña en el login
 Usuario.prototype.validPassword = async function(password) {
     return await bcrypt.compare(password, this.password);
 };

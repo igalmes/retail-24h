@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const Producto = require('../models/Producto');
 const geminiService = require('./geminiService');
+const Usuario = require('../models/Usuario');
 
 const sessions = {};
 
