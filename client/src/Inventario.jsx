@@ -6,6 +6,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     const [loteDetectado, setLoteDetectado] = useState(null); 
     const [loading, setLoading] = useState(false);
 
+    // Instrucción de diseño: Inter para texto, Roboto Mono para números
     const fontTexto = { fontFamily: "'Inter', sans-serif" };
     const fontNumeros = { fontFamily: "'Roboto Mono', monospace" };
 
@@ -50,7 +51,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                     'Content-Type': 'multipart/form-data' 
                 }
             });
-            // Se espera que la IA devuelva imagePreview y la lista de items detectados
             setLoteDetectado(res.data);
         } catch (err) {
             alert("Error en detección masiva");
@@ -84,25 +84,24 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     return (
         <div className="inventory-pro" style={{ padding: '20px', ...fontTexto }}>
             
-            {/* MODAL PROFESIONAL DE CARGA POR IA */}
+            {/* MODAL DE CARGA POR IA */}
             {loteDetectado && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <div style={{ background: 'white', borderRadius: '16px', maxWidth: '500px', width: '100%', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+                    <div style={{ background: 'white', borderRadius: '16px', maxWidth: '500px', width: '100%', overflow: 'hidden' }}>
                         <div style={{ height: '200px', background: `url(${loteDetectado.imagePreview}) center/cover`, borderBottom: '4px solid #2563eb' }}></div>
                         <div style={{ padding: '24px' }}>
-                            <h3 style={{ margin: '0 0 10px 0' }}>Confirmar Ingreso de Mercadería</h3>
-                            <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '20px' }}>La IA detectó los siguientes productos en la góndola:</p>
-                            <div style={{ maxHeight: '180px', overflowY: 'auto', marginBottom: '20px', background: '#f8fafc', borderRadius: '8px', padding: '10px' }}>
+                            <h3 style={{ margin: '0' }}>Confirmar Ingreso</h3>
+                            <div style={{ maxHeight: '180px', overflowY: 'auto', margin: '20px 0', background: '#f8fafc', borderRadius: '8px', padding: '10px' }}>
                                 {loteDetectado.items.map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: idx !== loteDetectado.items.length -1 ? '1px solid #e2e8f0' : 'none' }}>
-                                        <span style={{ fontWeight: '500' }}>{item.nombre}</span>
+                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e2e8f0' }}>
+                                        <span>{item.nombre}</span>
                                         <b style={{ color: '#2563eb', ...fontNumeros }}>+{item.cantidad}</b>
                                     </div>
                                 ))}
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
-                                <button onClick={confirmarCargaStock} style={{ flex: 2, background: '#16a34a', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>CONFIRMAR Y CARGAR</button>
-                                <button onClick={() => setLoteDetectado(null)} style={{ flex: 1, background: '#f1f5f9', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', color: '#475569' }}>CANCELAR</button>
+                                <button onClick={confirmarCargaStock} style={{ flex: 2, background: '#16a34a', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>CARGAR</button>
+                                <button onClick={() => setLoteDetectado(null)} style={{ flex: 1, background: '#f1f5f9', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer' }}>CERRAR</button>
                             </div>
                         </div>
                     </div>
@@ -111,19 +110,18 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
 
             <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', alignItems: 'center' }}>
                 <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>Gestión Operativa</h1>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <input type="file" id="ia-upload" hidden onChange={handleEscaneoMasivo} />
-                    <label htmlFor="ia-upload" style={{ cursor: 'pointer', background: '#2563eb', color: 'white', padding: '10px 22px', borderRadius: '8px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
-                        {loading ? '⌛ Analizando...' : '📷 Escaneo Masivo'}
-                    </label>
-                </div>
+                <input type="file" id="ia-upload" hidden onChange={handleEscaneoMasivo} />
+                <label htmlFor="ia-upload" style={{ cursor: 'pointer', background: '#2563eb', color: 'white', padding: '10px 22px', borderRadius: '8px', fontWeight: '600' }}>
+                    {loading ? '⌛ Analizando...' : '📷 Escaneo Masivo'}
+                </label>
             </header>
 
-            <div className="table-card" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                         <tr style={{ color: '#64748b', fontSize: '0.85rem', textTransform: 'uppercase' }}>
                             <th style={{ padding: '15px', width: '50px' }}>Add</th>
+                            <th style={{ padding: '15px', width: '60px' }}>Foto</th>
                             <th style={{ padding: '15px', textAlign: 'left' }}>Producto / Marca</th>
                             <th style={{ padding: '15px', textAlign: 'center' }}>Stock</th>
                             <th style={{ padding: '15px', textAlign: 'right' }}>Precio Venta</th>
@@ -134,8 +132,23 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                         {productos.map(p => (
                             <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '15px', textAlign: 'center' }}>
-                                    <button onClick={() => manejarSeleccion(p)} style={{ border: '1px', background: '#28282B', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+                                    <button onClick={() => manejarSeleccion(p)} style={{ border: 'none', background: '#28282B', color: 'white', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>+</button>
                                 </td>
+                                
+                                {/* IMAGEN DESDE DB AIVEN */}
+                                <td style={{ padding: '10px', textAlign: 'center' }}>
+                                    {p.imagen_url ? (
+                                        <img 
+                                            src={p.imagen_url} 
+                                            alt={p.nombre} 
+                                            style={{ width: '45px', height: '45px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0' }} 
+                                            onError={(e) => { e.target.style.display = 'none'; }} 
+                                        />
+                                    ) : (
+                                        <div style={{ width: '45px', height: '45px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#94a3b8' }}>N/A</div>
+                                    )}
+                                </td>
+
                                 <td style={{ padding: '15px' }}>
                                     <div style={{ fontWeight: '600', color: '#0f172a' }}>{p.nombre}</div>
                                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{p.marca} | {p.codigo_barras}</div>
@@ -145,22 +158,14 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                                         type="number" 
                                         defaultValue={p.stock_actual}
                                         onBlur={(e) => guardarCambios(p.id, 'stock_actual', e.target.value)}
-                                        style={{ width: '60px', textAlign: 'center', border: '1px solid transparent', padding: '5px', borderRadius: '4px', fontWeight: 'bold' }}
+                                        style={{ width: '50px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '4px' }}
                                     />
                                 </td>
                                 <td style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', color: '#16a34a', ...fontNumeros }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                                        <span>$</span>
-                                        <input 
-                                            type="number" 
-                                            defaultValue={p.precio_actualizado}
-                                            onBlur={(e) => guardarCambios(p.id, 'precio_actualizado', e.target.value)}
-                                            style={{ width: '85px', textAlign: 'right', border: '1px solid transparent', color: '#16a34a', fontWeight: 'bold', fontSize: '1rem' }}
-                                        />
-                                    </div>
+                                    ${p.precio_actualizado}
                                 </td>
                                 <td style={{ padding: '15px', textAlign: 'right' }}>
-                                    <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', ...fontNumeros }}>
+                                    <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', ...fontNumeros }}>
                                         ${(p.precio_actualizado - (p.precio_compra || 0)).toFixed(2)}
                                     </span>
                                 </td>
