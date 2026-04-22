@@ -38,6 +38,7 @@ function App() {
     const tokenAct = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
     if (!tokenAct) return;
+
     try {
       const res = await fetch(`${API_URL}/api/productos`, {
         headers: {
@@ -109,8 +110,8 @@ function App() {
         <div className="login-screen">
           <div className="login-box">
             <div className="login-logo" style={{ backgroundImage: `url(${configComercio.logo})`, width: '80px', height: '80px', margin: '0 auto 20px', backgroundSize: 'cover', borderRadius: '12px' }}></div>
-            <h1 style={{ fontWeight: '800', color: '#1a1a1a' }}>{configComercio.nombre}</h1>
-            <p style={{ fontWeight: '600', color: '#64748b' }}>Gestión Inteligente de Inventario</p>
+            <h1 style={{ fontWeight: '800' }}>{configComercio.nombre}</h1>
+            <p>Gestión Inteligente de Inventario</p>
             <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => { }} useOneTap />
           </div>
         </div>
@@ -129,20 +130,16 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
-          <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>
-            🚀 <span style={{ fontWeight: '700' }}>Inventario PRO</span>
-          </button>
-          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>
-            👥 <span style={{ fontWeight: '700' }}>Clientes</span>
-          </button>
+          <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 <span style={{ fontWeight: '700' }}>Inventario PRO</span></button>
+          <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 <span style={{ fontWeight: '700' }}>Clientes</span></button>
           <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
             <button className="nav-btn" style={{ color: '#22c55e', fontWeight: '700' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>💬 WhatsApp</button>
           </div>
         </nav>
 
-        {/* CARRITO MEJORADO: ALTO CONTRASTE Y ELIMINAR ITEM */}
+        {/* CARRITO CON COLORES CORREGIDOS */}
         <div className="cart-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <p className="cart-label">CARRITO</p>
             {carrito.length > 0 && (
               <button onClick={vaciarCarrito} className="btn-clear-all">VACIAR</button>
@@ -154,23 +151,19 @@ function App() {
               <div key={item.id} className="cart-item-row">
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span className="cart-item-name">{item.cantidad}x {item.nombre}</span>
-                  <span className="cart-item-sub">Sub: ${(item.precio_actualizado * item.cantidad).toLocaleString()}</span>
+                  <span className="cart-item-sub font-numeric">${(item.precio_actualizado * item.cantidad).toLocaleString()}</span>
                 </div>
-                {/* BOTÓN ELIMINAR ITEM INDIVIDUAL */}
-                <button 
-                  onClick={() => eliminarDelCarrito(item.id)} 
-                  className="btn-remove-item"
-                >✕</button>
+                <button onClick={() => eliminarDelCarrito(item.id)} className="btn-remove-item">✕</button>
               </div>
             ))}
           </div>
 
-          <p className="cart-label" style={{ marginTop: '10px' }}>TOTAL VENTA</p>
+          <p className="cart-label" style={{ marginTop: '12px' }}>TOTAL VENTA</p>
           <b className="total-price font-numeric">
             ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
           </b>
           <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
-            {cargando ? '...' : 'PAGAR AHORA'}
+            {cargando ? 'PROCESANDO...' : 'CONFIRMAR PAGO'}
           </button>
         </div>
 
@@ -186,14 +179,14 @@ function App() {
             <h2 style={{ margin: 0, fontWeight: '800', color: '#0f172a' }}>{configComercio.nombre}</h2>
           </div>
           <div className="user-badge">
-            <span className="d-none-mobile" style={{ fontWeight: '700', color: '#1e293b' }}>{user?.nombre || 'Admin'}</span>
+            <span className="d-none-mobile" style={{ fontWeight: '700' }}>{user?.nombre || 'Admin'}</span>
             <div className="avatar" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           </div>
         </header>
 
         {cargando && <div className="loading-bar-container"><div className="loading-bar-fill"></div></div>}
 
-        <div style={{ padding: '2rem' }}>
+        <div style={{ padding: '1.5rem' }}>
           {view === 'inventario_pro' ? (
             <Inventario 
               token={token} 
@@ -204,8 +197,8 @@ function App() {
             />
           ) : (
             <div className="placeholder-module">
-              <h3 style={{ fontWeight: '800' }}>Módulo de {view}</h3>
-              <p>Próximamente disponible para {configComercio.nombre}</p>
+              <h3>Módulo de {view}</h3>
+              <p>Próximamente disponible.</p>
             </div>
           )}
         </div>
