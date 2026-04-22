@@ -163,7 +163,7 @@ function App() {
               carrito.map(item => (
                 <div key={item.id} className="cart-item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderBottom: '1px solid #334155', paddingBottom: '5px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span className="cart-item-name" style={{ color: '#f8fafc', fontSize: '0.85rem', fontWeight: '600' }}>{item.cantidad}x {item.nombre}</span>
+                    <span className="cart-item-name" style={{ color: '#050505', fontSize: '0.85rem', fontWeight: '600' }}>{item.cantidad}x {item.nombre}</span>
                     <span className="cart-item-sub" style={{ ...fontNumeros, color: '#38bdf8', fontSize: '0.8rem' }}>${(item.precio_actualizado * item.cantidad).toLocaleString()}</span>
                   </div>
                   <button onClick={() => eliminarDelCarrito(item.id)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>✕</button>
