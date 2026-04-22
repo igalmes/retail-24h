@@ -12,12 +12,15 @@ const Producto = sequelize.define('Producto', {
     imagen_url: { type: DataTypes.STRING },
     codigo_barras: { type: DataTypes.STRING },
     ultima_sincronizacion_api: { type: DataTypes.DATE },
+    precio_compra: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+    stock_minimo_alerta: { type: DataTypes.INTEGER, defaultValue: 5 },
+    proveedor: { type: DataTypes.STRING, defaultValue: 'Sin Proveedor' },
     // NUEVO: El eje de la consulta ahora es el comercio
     comercioId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'Comercios',
+            model: 'Usuarios',
             key: 'id'
         }
     },
