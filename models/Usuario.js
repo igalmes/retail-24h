@@ -17,9 +17,13 @@ const Usuario = sequelize.define('Usuario', {
         allowNull: false 
     },
     rol: { 
-        // Actualizado para incluir socio y cliente
         type: DataTypes.ENUM('admin', 'empleado', 'socio', 'cliente'), 
-        defaultValue: 'admin' 
+        defaultValue: 'cliente' // Cambiado a cliente por seguridad
+    },
+    telefono: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: true
     },
     // NUEVO: Relación con la tabla Comercios
     comercioId: {

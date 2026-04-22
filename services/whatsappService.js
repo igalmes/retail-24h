@@ -59,26 +59,43 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('message_create', async (msg) => {
-        if (!msg.from.endsWith('@c.us')) return;
+    if (!msg.from.endsWith('@c.us')) return;
 
-        const textoOriginal = msg.body.trim();
-        const textoLower = textoOriginal.toLowerCase();
+    const textoOriginal = msg.body.trim();
+    const textoLower = textoOriginal.toLowerCase();
+    const numeroWhatsApp = msg.from.replace('@c.us', '');
 
-        if (textoLower === 'ping') return msg.reply('pong! 🏓');
+    if (textoLower.startsWith('bot')) {
+        try {
+            // 1. Identificar al usuario en la DB
+            const usuario = await Usuario.findOne({ where: { telefono: numeroWhatsApp } });
+            const rol = usuario ? usuario.rol : 'cliente';
+            const nombre = usuario ? usuario.nombre : 'Cliente';
 
-        const tieneTriggerIA = textoLower.startsWith('bot');
-        if (tieneTriggerIA && (!msg.fromMe || textoLower.startsWith('bot'))) {
-            try {
-                const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
-                if (!consultaIA) return;
+            const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
 
-                const respuestaIA = await geminiService.procesarChatBot(consultaIA);
-                await msg.reply(respuestaIA.mensaje);
-            } catch (error) {
-                console.error("❌ IA Error:", error.message);
+            // 2. ¿La consulta requiere datos de la DB? (Palabras clave)
+            let datosDB = [];
+            const disparadoresDB = ['stock', 'inventario', 'lista', 'precio', 'cuanto', 'hay', 'vende'];
+            
+            if (disparadoresDB.some(palabra => textoLower.includes(palabra))) {
+                datosDB = await Producto.findAll({
+                    attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
+                    raw: true
+                });
             }
+
+            // 3. Procesar con Gemini pasando la data real
+            const respuestaIA = await geminiService.procesarChatBot(consultaIA, rol, datosDB, nombre);
+            
+            await msg.reply(respuestaIA.mensaje);
+
+        } catch (error) {
+            console.error("❌ Error en flujo Bot:", error);
+            await msg.reply("Lo siento, hubo un error al consultar mi base de datos. 🤖");
         }
-    });
+    }
+});
 
     try {
         await client.initialize();

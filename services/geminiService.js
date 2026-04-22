@@ -13,17 +13,32 @@ const limpiarJSON = (texto) => {
 };
 
 // Función para el Bot de WhatsApp (Texto)
-const procesarChatBot = async (mensajeUsuario) => {
+const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [], nombre = 'Usuario') => {
     try {
+        // Formateamos el inventario para que Gemini no se maree con JSON gigante
+        const stockResumido = inventario.length > 0 
+            ? inventario.map(p => `- ${p.nombre}: $${p.precio_actualizado} (Stock: ${p.stock_actual})`).join('\n')
+            : "No hay productos cargados actualmente.";
+
+        const systemPrompt = `
+        Eres el asistente de "Retail 24h AI". Estás hablando con ${nombre} (Rol: ${rol.toUpperCase()}).
+        
+        INSTRUCCIONES DE ROL:
+        - Si es ADMIN o SOCIO: Tienes acceso total. Puedes dar reportes detallados y análisis de stock.
+        - Si es CLIENTE: Sé un vendedor amable. No des números exactos de stock, solo di si hay o no.
+        
+        INVENTARIO REAL DE LA DB:
+        ${stockResumido}
+        
+        REGLAS DE RESPUESTA:
+        Responde ESTRICTAMENTE en JSON con este formato:
+        {"esPedido": boolean, "items": [], "mensaje": "Tu respuesta aquí"}
+        `;
+
         const payload = {
             contents: [{
                 parts: [{
-                    text: `Eres el asistente de "Retail 24h". Analiza el mensaje y responde ESTRICTAMENTE en JSON.
-                    Reglas: 
-                    1. Si es pedido: {"esPedido": true, "items": [{"producto": "nombre", "cantidad": 1}], "mensaje": "Resumen"}
-                    2. Si no es pedido: {"esPedido": false, "items": [], "mensaje": "Saludo o respuesta amable"}
-                    
-                    Mensaje: "${mensajeUsuario}"`
+                    text: `${systemPrompt}\n\nMensaje del usuario: "${mensajeUsuario}"`
                 }]
             }]
         };
@@ -32,11 +47,10 @@ const procesarChatBot = async (mensajeUsuario) => {
         const rawText = result.data.candidates[0].content.parts[0].text;
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
-        console.error(`❌ Error Gemini Texto (${MODELO}):`, error.message);
+        console.error(`❌ Error Gemini:`, error.message);
         return { esPedido: false, items: [], mensaje: "Hola! ¿En qué puedo ayudarte?" };
     }
 };
-
 // Función para analizar imágenes (Góndola)
 const analizarGondola = async (imageUrl) => {
     try {
