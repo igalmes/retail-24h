@@ -50,6 +50,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                     'Content-Type': 'multipart/form-data' 
                 }
             });
+            // Se espera que la IA devuelva imagePreview y la lista de items detectados
             setLoteDetectado(res.data);
         } catch (err) {
             alert("Error en detección masiva");
@@ -90,7 +91,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                         <div style={{ height: '200px', background: `url(${loteDetectado.imagePreview}) center/cover`, borderBottom: '4px solid #2563eb' }}></div>
                         <div style={{ padding: '24px' }}>
                             <h3 style={{ margin: '0 0 10px 0' }}>Confirmar Ingreso de Mercadería</h3>
-                            <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '20px' }}>La IA detectó los siguientes productos:</p>
+                            <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '20px' }}>La IA detectó los siguientes productos en la góndola:</p>
                             <div style={{ maxHeight: '180px', overflowY: 'auto', marginBottom: '20px', background: '#f8fafc', borderRadius: '8px', padding: '10px' }}>
                                 {loteDetectado.items.map((item, idx) => (
                                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: idx !== loteDetectado.items.length -1 ? '1px solid #e2e8f0' : 'none' }}>
@@ -111,7 +112,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
             <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', alignItems: 'center' }}>
                 <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>Gestión Operativa</h1>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <input type="file" id="ia-upload" hidden onChange={handleEscaneoMasive} />
+                    <input type="file" id="ia-upload" hidden onChange={handleEscaneoMasivo} />
                     <label htmlFor="ia-upload" style={{ cursor: 'pointer', background: '#2563eb', color: 'white', padding: '10px 22px', borderRadius: '8px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
                         {loading ? '⌛ Analizando...' : '📷 Escaneo Masivo'}
                     </label>
@@ -123,7 +124,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                     <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                         <tr style={{ color: '#64748b', fontSize: '0.85rem', textTransform: 'uppercase' }}>
                             <th style={{ padding: '15px', width: '50px' }}>Add</th>
-                            <th style={{ padding: '15px', width: '60px', textAlign: 'center' }}>Foto</th>
                             <th style={{ padding: '15px', textAlign: 'left' }}>Producto / Marca</th>
                             <th style={{ padding: '15px', textAlign: 'center' }}>Stock</th>
                             <th style={{ padding: '15px', textAlign: 'right' }}>Precio Venta</th>
@@ -134,23 +134,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                         {productos.map(p => (
                             <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '15px', textAlign: 'center' }}>
-                                    <button onClick={() => manejarSeleccion(p)} className="btn-plus">+</button>
-                                </td>
-                                {/* COLUMNA DE IMAGEN */}
-                                <td style={{ padding: '10px', textAlign: 'center' }}>
-                                    <div style={{ 
-                                        width: '40px', 
-                                        height: '40px', 
-                                        borderRadius: '8px', 
-                                        backgroundColor: '#f1f5f9',
-                                        backgroundImage: p.imagen_url ? `url(${p.imagen_url})` : 'none',
-                                        backgroundSize: 'cover',
-                                        backgroundPosition: 'center',
-                                        margin: '0 auto',
-                                        border: '1px solid #e2e8f0'
-                                    }}>
-                                        {!p.imagen_url && <span style={{ fontSize: '10px', color: '#cbd5e1' }}>N/A</span>}
-                                    </div>
+                                    <button onClick={() => manejarSeleccion(p)} style={{ border: '1px', background: '#28282B', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
                                 </td>
                                 <td style={{ padding: '15px' }}>
                                     <div style={{ fontWeight: '600', color: '#0f172a' }}>{p.nombre}</div>
