@@ -1,122 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import './App.css';
-import Inventario from './Inventario';
-
-const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:4000/api' 
-    : 'https://retail-24h.onrender.com/api';
-
-const GOOGLE_CLIENT_ID = "264704665731-hi7jv7mvdnrud4cfoumuth3sok12mdb3.apps.googleusercontent.com"; 
-
-function App() {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [lista, setLista] = useState([]);
-  const [view, setView] = useState('inventario_pro'); // Vista por defecto cambiada a la Pro
-  const [cargando, setCargando] = useState(false);
-  const [busqueda, setBusqueda] = useState('');
-  
-  const [carrito, setCarrito] = useState(() => {
-    const guardado = localStorage.getItem('carrito');
-    return guardado ? JSON.parse(guardado) : [];
-  });
-
-  const [editando, setEditando] = useState(null); 
-  const [menuAbierto, setMenuAbierto] = useState(false);
-  const logoInputRef = useRef(null);
-
-  // --- ESTADOS PARA PERSONALIZACIÓN ---
-  const [configComercio, setConfigComercio] = useState(() => {
-    const guardado = localStorage.getItem('configComercio');
-    return guardado ? JSON.parse(guardado) : { 
-      nombre: "Retail 24h AI", 
-      logo: "https://via.placeholder.com/40" 
-    };
-  });
-  const [editandoNombre, setEditandoNombre] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem('carrito', JSON.stringify(carrito));
-  }, [carrito]);
-
-  useEffect(() => {
-    localStorage.setItem('configComercio', JSON.stringify(configComercio));
-  }, [configComercio]);
-
-  // Carga de Configuración desde el Servidor
-  useEffect(() => {
-    const cargarConfigDeNube = async () => {
-      if (!token) return;
-      try {
-        const res = await fetch(`${API_URL}/config`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.nombreEmpresa || data.logoUrl) {
-            setConfigComercio({
-              nombre: data.nombreEmpresa || "Retail 24h AI",
-              logo: data.logoUrl || "https://via.placeholder.com/40"
-            });
-          }
-        }
-      } catch (err) { console.error("Error cargando configuración remota"); }
-    };
-    cargarConfigDeNube();
-  }, [token]);
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('carrito');
-    setCarrito([]);
-  };
-
-  const guardarConfigEnNube = async (nuevosDatos) => {
-    if (!token) return;
-    try {
-      const payload = {
-        nombreEmpresa: nuevosDatos.nombre || configComercio.nombre,
-        logoUrl: nuevosDatos.logo || configComercio.logo
-      };
-      const res = await fetch(`${API_URL}/config`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        setConfigComercio(prev => ({ ...prev, ...nuevosDatos }));
-      }
-    } catch (err) { console.error("Error al guardar en nube"); }
-  };
-
-  const cambiarNombreEmpresa = (nuevoNombre) => {
-    if (!nuevoNombre || nuevoNombre === configComercio.nombre) {
-        setEditandoNombre(false);
-        return;
-    }
-    guardarConfigEnNube({ nombre: nuevoNombre });
-    setEditandoNombre(false);
-  };
-
-  const manejarCambioLogo = (e) => {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      guardarConfigEnNube({ logo: reader.result });
-    };
-    reader.readAsDataURL(archivo);
-  };
-
- import React, { useState, useEffect, useRef } from 'react';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import Inventario from './Inventario'; // Asegúrate de que la ruta sea correcta
+import Inventario from './Inventario'; 
 
 const GOOGLE_CLIENT_ID = "TU_CLIENT_ID.apps.googleusercontent.com"; 
 
@@ -124,17 +8,17 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [lista, setLista] = useState([]);
-  const [carrito, setCarrito] = useState([]); // Estado del carrito
+  const [carrito, setCarrito] = useState([]); 
   const [view, setView] = useState('inventario_pro');
   const [cargando, setCargando] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [editandoNombre, setEditandoNombre] = useState(false);
   const [configComercio, setConfigComercio] = useState({
-    nombre: "Mi Comercio",
+    nombre: "Retail 24h AI",
     logo: "https://via.placeholder.com/80"
   });
 
-  const API_URL = "https://tu-backend.com"; // Reemplazar por tu URL real
+  const API_URL = "https://tu-backend.com"; // Reemplazar por tu URL de Render/Producción
   const logoInputRef = useRef(null);
 
   const logout = () => {
@@ -183,8 +67,12 @@ function App() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('userEmail', data.user.email);
       }
-    } catch (err) { alert("Error de conexión"); }
-    finally { setCargando(false); }
+    } catch (err) { 
+        console.error(err);
+        alert("Error de conexión"); 
+    } finally { 
+        setCargando(false); 
+    }
   };
 
   const manejarPago = async () => {
@@ -247,7 +135,7 @@ function App() {
 
         <div className="cart-card">
           <p className="cart-label">TOTAL VENTA</p>
-          <b className="total-price">
+          <b className="total-price" style={{ fontFamily: "'Roboto Mono', monospace" }}>
             ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
           </b>
           <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
@@ -267,10 +155,12 @@ function App() {
             <h2 style={{ margin: 0 }}>{configComercio.nombre}</h2>
           </div>
           <div className="user-badge">
-            <span>{user?.nombre || 'Admin'}</span>
+            <span className="d-none-mobile">{user?.nombre || 'Admin'}</span>
             <div className="avatar" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           </div>
         </header>
+
+        {cargando && <div className="loading-bar-container"><div className="loading-bar-fill"></div></div>}
 
         {view === 'inventario_pro' ? (
           <Inventario 
@@ -281,7 +171,10 @@ function App() {
             setCarrito={setCarrito}
           />
         ) : (
-          <div className="placeholder-module"><h3>Módulo de {view}</h3></div>
+          <div className="placeholder-module">
+            <h3>Módulo de {view}</h3>
+            <p>Próximamente disponible para {configComercio.nombre}</p>
+          </div>
         )}
       </main>
     </div>
