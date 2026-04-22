@@ -134,7 +134,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                         {productos.map(p => (
                             <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '15px', textAlign: 'center' }}>
-                                    <button onClick={() => manejarSeleccion(p)} style={{ border: 'none', background: '#f1f5f9', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+                                    <button onClick={() => manejarSeleccion(p)} style={{ border: '1px', background: '#28282B', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
                                 </td>
                                 <td style={{ padding: '15px' }}>
                                     <div style={{ fontWeight: '600', color: '#0f172a' }}>{p.nombre}</div>

@@ -125,7 +125,7 @@ function App() {
 
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="mini-logo" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
+          <div className="mini-logo" style={{ backgroundImage: `url(${configComercio.logo})` }}>logo</div>
           <span style={{ fontWeight: '800' }}>{configComercio.nombre}</span>
         </div>
 
