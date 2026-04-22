@@ -2,22 +2,27 @@ const axios = require("axios");
 require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
-// Mantenemos el modelo flash para velocidad de respuesta en WhatsApp
-const MODELO = "gemini-2.5-flash"; 
+// Usamos 1.5-flash para mayor estabilidad y evitar errores 429 de cuota
+const MODELO = "gemini-1.5-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
 
 /**
  * Helper para limpiar el formato Markdown que a veces devuelve la IA
  */
 const limpiarJSON = (texto) => {
-    return texto.replace(/```json/g, "").replace(/```/g, "").trim();
+    try {
+        return texto.replace(/```json/g, "").replace(/```/g, "").trim();
+    } catch (e) {
+        return texto;
+    }
 };
 
 // Función para el Bot de WhatsApp (Texto)
 const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [], nombre = 'Usuario') => {
     try {
+        // Reducimos el inventario a 20 items para no saturar la API y evitar el error 429
         const stockResumido = inventario.length > 0 
-            ? inventario.map(p => `- ${p.nombre}: $${p.precio_actualizado} (Stock: ${p.stock_actual})`).join('\n')
+            ? inventario.slice(0, 20).map(p => `- ${p.nombre}: $${p.precio_actualizado} (Stock: ${p.stock_actual})`).join('\n')
             : "No hay productos cargados actualmente.";
 
         const systemPrompt = `
@@ -30,7 +35,7 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
             3. MODIFICAR/ACTUALIZAR: Usa accion "actualizar".
         - Si no hay una instrucción clara de cambio, usa accion "ninguna".
         
-        INVENTARIO REAL ACTUAL:
+        INVENTARIO REAL ACTUAL (Muestra limitada):
         ${stockResumido}
         
         REGLAS DE RESPUESTA:
@@ -55,6 +60,9 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
         const rawText = result.data.candidates[0].content.parts[0].text;
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
+        if (error.response && error.response.status === 429) {
+            return { esPedido: false, accion: "ninguna", payload: {}, mensaje: "Estoy procesando muchos mensajes, por favor espera unos segundos. 🤖" };
+        }
         console.error(`❌ Error Gemini:`, error.message);
         return { esPedido: false, accion: "ninguna", payload: {}, mensaje: "Hola! ¿En qué puedo ayudarte?" };
     }
@@ -63,7 +71,6 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
 // Función para analizar imágenes (Góndola)
 const analizarGondola = async (imageUrl) => {
     try {
-        console.log(">>> Descargando imagen para Gemini...");
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Data = Buffer.from(responseImage.data).toString('base64');
 

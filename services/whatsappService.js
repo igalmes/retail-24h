@@ -32,23 +32,22 @@ const initialize = async (userId = 1) => {
     client.on('ready', () => { console.log(`🚀 [BOT]: WhatsApp conectado.`); });
 
     client.on('message_create', async (msg) => {
+        // Filtro básico: solo chats individuales y que empiecen con "bot"
         if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
 
         try {
             const numero = msg.from.replace('@c.us', '');
             
-            // 1. Buscamos al usuario y su comercioId
+            // 1. Buscamos al usuario para obtener su rol, comercioId y su ID de base de datos
             const user = await Usuario.findOne({ where: { telefono: numero } });
             if (!user) {
                 return await msg.reply("No estás registrado en el sistema. Contacta al administrador.");
             }
 
-            const rol = user.rol;
-            const nombre = user.nombre;
-            const comercioId = user.comercioId; // Extraemos el ID del comercio del usuario
+            const { id: dbUsuarioId, rol, nombre, comercioId } = user;
             const consulta = msg.body.replace(/^bot\s*/i, "");
 
-            // 2. Traemos solo los productos de SU comercio
+            // 2. Traemos el inventario filtrado por comercio
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
                 attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
@@ -57,7 +56,7 @@ const initialize = async (userId = 1) => {
 
             const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre);
 
-            // 3. EJECUCIÓN DB CON ASIGNACIÓN DE COMERCIO
+            // 3. EJECUCIÓN DB
             if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
                 console.log(`🛠️ Acción: ${resIA.accion} | Producto: ${resIA.payload.nombre} | Comercio: ${comercioId}`);
                 
@@ -67,14 +66,15 @@ const initialize = async (userId = 1) => {
                             nombre: resIA.payload.nombre,
                             precio_actualizado: resIA.payload.precio || 0,
                             stock_actual: resIA.payload.cantidad || 0,
-                            comercioId: comercioId // CORRECCIÓN: Ahora pasamos el ID obligatorio
+                            comercioId: comercioId,
+                            UsuarioId: dbUsuarioId // CORRECCIÓN: Evita el error de campo obligatorio
                         });
                     } 
                     else if (resIA.accion === 'eliminar') {
                         await Producto.destroy({ 
                             where: { 
                                 nombre: resIA.payload.nombre,
-                                comercioId: comercioId // Seguridad: Solo borra productos de su propio comercio
+                                comercioId: comercioId 
                             } 
                         });
                     }
@@ -94,7 +94,7 @@ const initialize = async (userId = 1) => {
                     }
                 } catch (dbErr) {
                     console.error("❌ Error en operación DB:", dbErr.message);
-                    return await msg.reply("Hubo un error al guardar los datos en tu comercio. 🤖");
+                    return await msg.reply(`Hubo un error al procesar en DB: ${dbErr.message}`);
                 }
             }
             
