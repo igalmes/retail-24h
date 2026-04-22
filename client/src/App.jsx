@@ -16,6 +16,8 @@ function App() {
     logo: "https://via.placeholder.com/80"
   });
 
+  const fontTexto = { fontFamily: "'Inter', sans-serif" };
+
   const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
     : window.location.origin;
@@ -120,7 +122,7 @@ function App() {
   }
 
   return (
-    <div className="admin-layout">
+    <div className="admin-layout" style={fontTexto}>
       {menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)}></div>}
 
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
@@ -137,7 +139,32 @@ function App() {
           </div>
         </nav>
 
-        cart-card
+        {/* CARRITO REPARADO Y MEJORADO */}
+        <div className="cart-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <p className="cart-label" style={{ margin: 0, fontWeight: '800', color: '#1e293b' }}>CARRITO</p>
+            {carrito.length > 0 && (
+              <button onClick={vaciarCarrito} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>VACIAR</button>
+            )}
+          </div>
+          
+          <div className="cart-items-list" style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '10px' }}>
+            {carrito.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', marginBottom: '6px', background: '#f1f5f9', padding: '8px', borderRadius: '6px' }}>
+                <span style={{ fontWeight: '800', color: '#0f172a' }}>{item.cantidad}x {item.nombre}</span>
+                <button onClick={() => eliminarDelCarrito(item.id)} style={{ border: 'none', background: '#cbd5e1', color: 'white', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          <p className="cart-label" style={{ fontWeight: '800' }}>TOTAL VENTA</p>
+          <b className="total-price" style={{ fontFamily: "'Roboto Mono', monospace", fontWeight: '800', color: '#16a34a' }}>
+            ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
+          </b>
+          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ fontWeight: '800' }}>
+            {cargando ? '...' : 'PAGAR'}
+          </button>
+        </div>
 
         <button className="btn-logout" onClick={logout}>Cerrar Sesión</button>
       </aside>
@@ -148,10 +175,10 @@ function App() {
             <button className="menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
               {menuAbierto ? '✕' : '☰'}
             </button>
-            <h2 style={{ margin: 0 }}>{configComercio.nombre}</h2>
+            <h2 style={{ margin: 0, fontWeight: '800' }}>{configComercio.nombre}</h2>
           </div>
           <div className="user-badge">
-            <span className="d-none-mobile">{user?.nombre || 'Admin'}</span>
+            <span className="d-none-mobile" style={{ fontWeight: '700' }}>{user?.nombre || 'Admin'}</span>
             <div className="avatar" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           </div>
         </header>
