@@ -114,30 +114,59 @@ function App() {
     reader.readAsDataURL(archivo);
   };
 
+ import React, { useState, useEffect, useRef } from 'react';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import Inventario from './Inventario'; // Asegúrate de que la ruta sea correcta
+
+const GOOGLE_CLIENT_ID = "TU_CLIENT_ID.apps.googleusercontent.com"; 
+
+function App() {
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [user, setUser] = useState(null);
+  const [lista, setLista] = useState([]);
+  const [carrito, setCarrito] = useState([]); // Estado del carrito
+  const [view, setView] = useState('inventario_pro');
+  const [cargando, setCargando] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [configComercio, setConfigComercio] = useState({
+    nombre: "Mi Comercio",
+    logo: "https://via.placeholder.com/80"
+  });
+
+  const API_URL = "https://tu-backend.com"; // Reemplazar por tu URL real
+  const logoInputRef = useRef(null);
+
+  const logout = () => {
+    localStorage.clear();
+    setToken(null);
+    setUser(null);
+  };
+
   // --- LÓGICA DE PRODUCTOS ---
   const obtenerProductos = async () => {
-    const token = localStorage.getItem('token'); // O donde lo guardes
+    const tokenAct = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
+    if (!tokenAct) return;
 
     try {
-        const res = await fetch(`${API_URL}/api/productos`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'x-user-email': email, // Mandamos ambos por seguridad
-                'Content-Type': 'application/json'
-            }
-        });
-        const data = await res.json();
-        // Ojo: ahora tu controller devuelve { productos: [...] }, no la lista sola.
-        setLista(data.productos || []); 
+      const res = await fetch(`${API_URL}/api/productos`, {
+        headers: {
+          'Authorization': `Bearer ${tokenAct}`,
+          'x-user-email': email,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      setLista(data.productos || []);
     } catch (error) {
-        console.error("Error al pedir productos", error);
+      console.error("Error al pedir productos", error);
     }
-};
+  };
 
   useEffect(() => {
     if (token) obtenerProductos();
-  }, [token, obtenerProductos]);
+  }, [token]);
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
@@ -152,33 +181,34 @@ function App() {
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('token', data.token);
+        localStorage.setItem('userEmail', data.user.email);
       }
-    } catch (err) { alert("Error de conexión"); } 
+    } catch (err) { alert("Error de conexión"); }
     finally { setCargando(false); }
   };
 
   const manejarPago = async () => {
     if (carrito.length === 0) return;
     try {
-        setCargando(true);
-        const res = await fetch(`${API_URL}/pagos/crear-preferencia`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
-            },
-            body: JSON.stringify({ 
-                items: carrito.map(p => ({
-                    id: String(p.id),
-                    title: p.nombre, 
-                    unit_price: Number(p.precio_actualizado), 
-                    quantity: p.cantidad
-                }))
-            })
-        });
-        const data = await res.json();
-        if (data.init_point) window.location.href = data.init_point;
-    } catch (err) { alert("Error al conectar con Mercado Pago"); } 
+      setCargando(true);
+      const res = await fetch(`${API_URL}/api/pagos/crear-preferencia`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: carrito.map(p => ({
+            id: String(p.id),
+            title: p.nombre,
+            unit_price: Number(p.precio_actualizado),
+            quantity: p.cantidad
+          }))
+        })
+      });
+      const data = await res.json();
+      if (data.init_point) window.location.href = data.init_point;
+    } catch (err) { alert("Error al conectar con Mercado Pago"); }
     finally { setCargando(false); }
   };
 
@@ -187,13 +217,10 @@ function App() {
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <div className="login-screen">
           <div className="login-box">
-            <div 
-              className="login-logo" 
-              style={{backgroundImage: `url(${configComercio.logo})`, width: '80px', height: '80px', margin: '0 auto 20px', backgroundSize: 'cover', borderRadius: '12px'}}
-            ></div>
+            <div className="login-logo" style={{ backgroundImage: `url(${configComercio.logo})`, width: '80px', height: '80px', margin: '0 auto 20px', backgroundSize: 'cover', borderRadius: '12px' }}></div>
             <h1>{configComercio.nombre}</h1>
             <p>Gestión Inteligente de Inventario</p>
-            <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => {}} useOneTap />
+            <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => { }} useOneTap />
           </div>
         </div>
       </GoogleOAuthProvider>
@@ -206,21 +233,18 @@ function App() {
 
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="mini-logo" style={{backgroundImage: `url(${configComercio.logo})`}}></div>
+          <div className="mini-logo" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           {configComercio.nombre}
         </div>
 
         <nav className="sidebar-nav">
-          {/* BOTÓN PARA EL NUEVO MÓDULO */}
           <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario PRO</button>
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
-          
           <div style={{ margin: '10px 0', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
             <button className="nav-btn" style={{ color: '#25D366' }} onClick={() => window.open(`${API_URL.replace('/api', '')}/qr`, '_blank')}>💬 WhatsApp</button>
           </div>
         </nav>
-        
-        {/* CARRITO SIEMPRE VISIBLE PARA VENTAS RÁPIDAS */}
+
         <div className="cart-card">
           <p className="cart-label">TOTAL VENTA</p>
           <b className="total-price">
@@ -230,47 +254,34 @@ function App() {
             {cargando ? '...' : 'PAGAR'}
           </button>
         </div>
-        
+
         <button className="btn-logout" onClick={logout}>Cerrar Sesión</button>
       </aside>
 
       <main className="content">
         <header className="content-header">
-          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <button className="menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)}>
               {menuAbierto ? '✕' : '☰'}
             </button>
-            <div className="brand-editable">
-              {editandoNombre ? (
-                <input autoFocus className="edit-brand-input" defaultValue={configComercio.nombre} onBlur={(e) => cambiarNombreEmpresa(e.target.value)} />
-              ) : (
-                <h2 style={{margin: 0, cursor: 'pointer'}} onClick={() => setEditandoNombre(true)}>
-                  {configComercio.nombre} <small style={{fontSize: '0.6em'}}>✎</small>
-                </h2>
-              )}
-            </div>
+            <h2 style={{ margin: 0 }}>{configComercio.nombre}</h2>
           </div>
           <div className="user-badge">
-            <span className="d-none-mobile">{user?.nombre || 'Admin'}</span>
-            <input type="file" ref={logoInputRef} hidden accept="image/*" onChange={manejarCambioLogo} />
-            <div 
-              className="avatar company-logo-trigger" 
-              style={{backgroundImage: `url(${configComercio.logo})`, cursor: 'pointer'}}
-              onClick={() => logoInputRef.current.click()}
-            ></div>
+            <span>{user?.nombre || 'Admin'}</span>
+            <div className="avatar" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           </div>
         </header>
 
-        {cargando && <div className="loading-bar-container"><div className="loading-bar-fill"></div></div>}
-
-        {/* --- NAVEGACIÓN DE VISTAS --- */}
         {view === 'inventario_pro' ? (
-          <Inventario token={token} API_URL={API_URL} refreshList={obtenerProductos} />
+          <Inventario 
+            token={token} 
+            API_URL={`${API_URL}/api`} 
+            refreshList={obtenerProductos}
+            carrito={carrito}
+            setCarrito={setCarrito}
+          />
         ) : (
-          <div className="placeholder-module">
-            <h3>Módulo de {view}</h3>
-            <p>Próximamente disponible para {configComercio.nombre}</p>
-          </div>
+          <div className="placeholder-module"><h3>Módulo de {view}</h3></div>
         )}
       </main>
     </div>
