@@ -137,31 +137,7 @@ function App() {
           </div>
         </nav>
 
-        <div className="cart-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <p className="cart-label" style={{ margin: 0 }}>CARRITO</p>
-            {carrito.length > 0 && (
-              <button onClick={vaciarCarrito} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>VACIAR</button>
-            )}
-          </div>
-          
-          <div className="cart-items-list" style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '10px' }}>
-            {carrito.map(item => (
-              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px' }}>
-                <span style={{ fontWeight: '600' }}>{item.cantidad}x {item.nombre}</span>
-                <button onClick={() => eliminarDelCarrito(item.id)} style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
-              </div>
-            ))}
-          </div>
-
-          <p className="cart-label">TOTAL VENTA</p>
-          <b className="total-price" style={{ fontFamily: "'Roboto Mono', monospace" }}>
-            ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
-          </b>
-          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando}>
-            {cargando ? '...' : 'PAGAR'}
-          </button>
-        </div>
+        cart-card
 
         <button className="btn-logout" onClick={logout}>Cerrar Sesión</button>
       </aside>
