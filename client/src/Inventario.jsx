@@ -7,16 +7,17 @@ const Inventario = ({ token, API_URL, refreshList }) => {
     const [loading, setLoading] = useState(false);
     const [alertas, setAlertas] = useState(0);
 
-    // 1. Cargar inventario con el Token de Auth
+    // Estilos de fuente por separado según preferencias
+    const fontTexto = { fontFamily: "'Inter', sans-serif" };
+    const fontNumeros = { fontFamily: "'Roboto Mono', monospace" };
+
+    // 1. Cargar inventario
     const fetchProductos = async () => {
         if (!token) return;
         try {
             const res = await axios.get(`${API_URL}/api/productos`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            // El backend devuelve { count, alertasFaltantes, productos }
             setProductos(res.data.productos || []);
             setAlertas(res.data.alertasFaltantes || 0);
         } catch (err) {
@@ -26,7 +27,7 @@ const Inventario = ({ token, API_URL, refreshList }) => {
 
     useEffect(() => {
         fetchProductos();
-    }, [token]); // Se recarga si el token cambia
+    }, [token]);
 
     // 2. Manejar la carga de imagen (IA)
     const handleIAUpload = async (e) => {
@@ -49,25 +50,41 @@ const Inventario = ({ token, API_URL, refreshList }) => {
                 setRepetidos(res.data.repetidos);
             } else {
                 alert(`Nuevos productos cargados: ${res.data.nuevosCount}`);
-                fetchProductos(); // Actualiza tabla local
-                if (refreshList) refreshList(); // Actualiza contadores en App.jsx
+                fetchProductos();
+                if (refreshList) refreshList();
             }
         } catch (err) {
             console.error("Error IA:", err.response?.data || err.message);
-            alert("Error en la detección de IA. Revisá la consola.");
+            alert("Error en la detección de IA.");
         } finally {
             setLoading(false);
-            e.target.value = null; // Reset del input file
+            e.target.value = null;
+        }
+    };
+
+    // 3. Confirmar producto repetido (Cierra el círculo con el backend)
+    const handleConfirmarRepetido = async (producto) => {
+        try {
+            await axios.post(`${API_URL}/api/productos/confirmar-repetido`, producto, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            // Remover el procesado de la lista para mostrar el siguiente
+            setRepetidos(prev => prev.slice(1));
+            fetchProductos();
+            if (refreshList) refreshList();
+        } catch (err) {
+            console.error("Error al confirmar repetido:", err);
+            alert("No se pudo actualizar el producto.");
         }
     };
 
     return (
-        <div className="inventory-container" style={{ padding: '20px' }}>
+        <div className="inventory-container" style={{ padding: '20px', ...fontTexto }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b' }}>Gestión de Inventario PRO</h1>
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                     {alertas > 0 && (
-                        <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                        <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', ...fontNumeros }}>
                             ⚠️ {alertas} Alertas de Stock
                         </span>
                     )}
@@ -88,7 +105,8 @@ const Inventario = ({ token, API_URL, refreshList }) => {
                             borderRadius: '8px', 
                             cursor: loading ? 'not-allowed' : 'pointer',
                             display: 'inline-block',
-                            transition: 'background 0.3s'
+                            transition: 'background 0.3s',
+                            fontWeight: '600'
                         }}
                     >
                         {loading ? '⌛ Analizando Góndola...' : '📷 Escanear con IA'}
@@ -111,26 +129,27 @@ const Inventario = ({ token, API_URL, refreshList }) => {
                     <tbody>
                         {productos.length > 0 ? productos.map(p => {
                             const margen = p.precio_actualizado - (p.precio_compra || 0);
-                            const esAlerta = p.stock_actual <= (p.stock_minimo_alerta || 0);
+                            const esAlerta = p.stock_actual <= (p.stock_minimo || 5);
 
                             return (
                                 <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: esAlerta ? '#fffaf0' : 'transparent' }}>
                                     <td style={{ padding: '15px' }}>
                                         <div style={{ fontWeight: '600', color: '#334155' }}>{p.nombre}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.marca} | {p.codigo_barras || 'Sin EAN'}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b', ...fontNumeros }}>{p.marca} | {p.codigo_barras || 'Sin EAN'}</div>
                                     </td>
-                                    <td style={{ padding: '15px', fontWeight: 'bold', color: esAlerta ? '#ef4444' : '#0f172a' }}>
+                                    <td style={{ padding: '15px', fontWeight: 'bold', color: esAlerta ? '#ef4444' : '#0f172a', ...fontNumeros }}>
                                         {p.stock_actual}
                                     </td>
-                                    <td style={{ padding: '15px', color: '#64748b' }}>${p.precio_compra || 0}</td>
-                                    <td style={{ padding: '15px', fontWeight: 'bold', color: '#16a34a' }}>${p.precio_actualizado}</td>
+                                    <td style={{ padding: '15px', color: '#64748b', ...fontNumeros }}>${p.precio_compra || 0}</td>
+                                    <td style={{ padding: '15px', fontWeight: 'bold', color: '#16a34a', ...fontNumeros }}>${p.precio_actualizado}</td>
                                     <td style={{ padding: '15px' }}>
                                         <span style={{ 
                                             backgroundColor: margen > 0 ? '#dcfce7' : '#f1f5f9', 
                                             color: margen > 0 ? '#166534' : '#475569',
                                             padding: '4px 8px',
                                             borderRadius: '6px',
-                                            fontSize: '0.8rem'
+                                            fontSize: '0.8rem',
+                                            ...fontNumeros
                                         }}>
                                             ${margen.toFixed(2)}
                                         </span>
@@ -158,10 +177,16 @@ const Inventario = ({ token, API_URL, refreshList }) => {
                             Detectamos <b>{repetidos[0].nombre}</b>. ¿Qué deseas hacer?
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button className="btn-modal-primary" style={{ backgroundColor: '#2563eb', color: 'white', padding: '12px', borderRadius: '8px', border: 'none', fontWeight: 'bold' }}>
+                            <button 
+                                onClick={() => handleConfirmarRepetido(repetidos[0])}
+                                style={{ backgroundColor: '#2563eb', color: 'white', padding: '12px', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
                                 Sumar Stock y Actualizar Precio
                             </button>
-                            <button onClick={() => setRepetidos(prev => prev.slice(1))} style={{ backgroundColor: '#f3f4f6', color: '#374151', padding: '12px', borderRadius: '8px', border: 'none' }}>
+                            <button 
+                                onClick={() => setRepetidos(prev => prev.slice(1))} 
+                                style={{ backgroundColor: '#f3f4f6', color: '#374151', padding: '12px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+                            >
                                 Ignorar
                             </button>
                         </div>

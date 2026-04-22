@@ -160,7 +160,30 @@ exports.buscarPorCodigo = async (req, res) => {
         res.status(500).json({ error: "Error en búsqueda" });
     }
 };
+exports.confirmarRepetido = async (req, res) => {
+    try {
+        const { nombre, codigo_barras, precio_actualizado } = req.body;
+        
+        // Buscamos el producto existente
+        const producto = await Producto.findOne({
+            where: { 
+                codigo_barras, 
+                comercioId: req.user.comercioId 
+            }
+        });
 
+        if (!producto) return res.status(404).json({ error: "Producto no encontrado" });
+
+        // Lógica: Sumamos 1 al stock (o lo que definas) y actualizamos precio
+        producto.stock_actual += 1;
+        producto.precio_actualizado = precio_actualizado;
+        await producto.save();
+
+        res.json({ mensaje: "Stock y precio actualizados", producto });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
 exports.ajustarStock = async (req, res) => {
     try {
         const { ean } = req.params;
