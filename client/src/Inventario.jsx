@@ -7,33 +7,35 @@ const Inventario = ({ token, API_URL, refreshList }) => {
     const [loading, setLoading] = useState(false);
     const [alertas, setAlertas] = useState(0);
 
-    // Estilos de fuente por separado según preferencias
+    // Estilos de fuente según tus especificaciones
     const fontTexto = { fontFamily: "'Inter', sans-serif" };
     const fontNumeros = { fontFamily: "'Roboto Mono', monospace" };
 
-    // 1. Cargar inventario
-    const fetchProductos = async () => {
-    if (!token) return;
-    try {
-        const res = await axios.get(`${API_URL}/api/productos`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        console.log("Respuesta completa:", res.data); // Mira esto en la consola del navegador (F12)
-        
-        // Validamos que existan los productos antes de setear
-        if (res.data && res.data.productos) {
-            setProductos(res.data.productos);
-            setAlertas(res.data.alertasFaltantes || 0);
-        } else {
-            console.warn("El backend no devolvió el array 'productos'");
+    // Carga automática al montar el componente
+    useEffect(() => {
+        if (token) {
+            fetchProductos();
         }
-    } catch (err) {
-        console.error("Error en la petición:", err.response?.data || err.message);
-    }
-};
+    }, [token, API_URL]);
 
-    // 2. Manejar la carga de imagen (IA)
+    // 1. OBTENER PRODUCTOS (URL corregida para evitar /api/api)
+    const fetchProductos = async () => {
+        if (!token) return;
+        try {
+            const res = await axios.get(`${API_URL}/productos`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.data && res.data.productos) {
+                setProductos(res.data.productos);
+                setAlertas(res.data.alertasFaltantes || 0);
+            }
+        } catch (err) {
+            console.error("Error al cargar inventario:", err.response?.data || err.message);
+        }
+    };
+
+    // 2. ESCANEO CON IA
     const handleIAUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -43,7 +45,7 @@ const Inventario = ({ token, API_URL, refreshList }) => {
 
         setLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/api/productos/detectar`, formData, {
+            const res = await axios.post(`${API_URL}/productos/detectar`, formData, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
@@ -62,17 +64,16 @@ const Inventario = ({ token, API_URL, refreshList }) => {
             alert("Error en la detección de IA.");
         } finally {
             setLoading(false);
-            e.target.value = null;
+            e.target.value = null; // Reset input
         }
     };
 
-    // 3. Confirmar producto repetido (Cierra el círculo con el backend)
+    // 3. CONFIRMAR REPETIDO
     const handleConfirmarRepetido = async (producto) => {
         try {
-            await axios.post(`${API_URL}/api/productos/confirmar-repetido`, producto, {
+            await axios.post(`${API_URL}/productos/confirmar-repetido`, producto, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            // Remover el procesado de la lista para mostrar el siguiente
             setRepetidos(prev => prev.slice(1));
             fetchProductos();
             if (refreshList) refreshList();
@@ -133,7 +134,7 @@ const Inventario = ({ token, API_URL, refreshList }) => {
                     <tbody>
                         {productos.length > 0 ? productos.map(p => {
                             const margen = p.precio_actualizado - (p.precio_compra || 0);
-                            const esAlerta = p.stock_actual <= (p.stock_minimo || 5);
+                            const esAlerta = p.stock_actual <= (p.stock_minimo_alerta || 5);
 
                             return (
                                 <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: esAlerta ? '#fffaf0' : 'transparent' }}>
