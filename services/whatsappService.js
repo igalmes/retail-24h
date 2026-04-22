@@ -29,36 +29,35 @@ const initialize = async (userId = 1) => {
         try { global.ultimoQR = await QRCodeImage.toDataURL(qr); } catch (e) {}
     });
 
-    client.on('ready', () => { console.log(`🚀 [BOT]: WhatsApp conectado.`); });
+    client.on('ready', () => { console.log(`🚀 [BOT]: WhatsApp conectado y escuchando.`); });
 
     client.on('message_create', async (msg) => {
-        // Filtro básico: solo chats individuales y que empiecen con "bot"
+        // Ignorar si no empieza con "bot" o si es un grupo (opcional)
         if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
 
         try {
             const numero = msg.from.replace('@c.us', '');
             
-            // 1. Buscamos al usuario para obtener su rol, comercioId y su ID de base de datos
+            // 1. Buscamos al usuario para obtener contexto
             const user = await Usuario.findOne({ where: { telefono: numero } });
-            if (!user) {
-                return await msg.reply("No estás registrado en el sistema. Contacta al administrador.");
-            }
+            if (!user) return;
 
             const { id: dbUsuarioId, rol, nombre, comercioId } = user;
             const consulta = msg.body.replace(/^bot\s*/i, "");
 
-            // 2. Traemos el inventario filtrado por comercio
+            // 2. Inventario filtrado
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
                 attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
                 raw: true
             });
 
+            // 3. Llamada a Gemini 2.5
             const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre);
 
-            // 3. EJECUCIÓN DB
+            // 4. Ejecución en DB
             if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
-                console.log(`🛠️ Acción: ${resIA.accion} | Producto: ${resIA.payload.nombre} | Comercio: ${comercioId}`);
+                console.log(`🛠️ Acción: ${resIA.accion} | Producto: ${resIA.payload.nombre} | UsuarioID: ${dbUsuarioId}`);
                 
                 try {
                     if (resIA.accion === 'crear') {
@@ -67,40 +66,29 @@ const initialize = async (userId = 1) => {
                             precio_actualizado: resIA.payload.precio || 0,
                             stock_actual: resIA.payload.cantidad || 0,
                             comercioId: comercioId,
-                            UsuarioId: dbUsuarioId // CORRECCIÓN: Evita el error de campo obligatorio
+                            UsuarioId: dbUsuarioId // CAMBIO CLAVE: Se añade el ID de usuario obligatorio
                         });
                     } 
                     else if (resIA.accion === 'eliminar') {
                         await Producto.destroy({ 
-                            where: { 
-                                nombre: resIA.payload.nombre,
-                                comercioId: comercioId 
-                            } 
+                            where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
                         });
                     }
                     else if (resIA.accion === 'actualizar') {
                         await Producto.update(
-                            { 
-                                precio_actualizado: resIA.payload.precio, 
-                                stock_actual: resIA.payload.cantidad 
-                            },
-                            { 
-                                where: { 
-                                    nombre: resIA.payload.nombre,
-                                    comercioId: comercioId 
-                                } 
-                            }
+                            { precio_actualizado: resIA.payload.precio, stock_actual: resIA.payload.cantidad },
+                            { where: { nombre: resIA.payload.nombre, comercioId: comercioId } }
                         );
                     }
                 } catch (dbErr) {
-                    console.error("❌ Error en operación DB:", dbErr.message);
-                    return await msg.reply(`Hubo un error al procesar en DB: ${dbErr.message}`);
+                    console.error("❌ Error DB:", dbErr.message);
+                    return await msg.reply(`Error de base de datos: ${dbErr.message}`);
                 }
             }
             
             await msg.reply(resIA.mensaje);
         } catch (err) {
-            console.error("Error general flujo bot:", err);
+            console.error("❌ Error flujo bot:", err.message);
         }
     });
 

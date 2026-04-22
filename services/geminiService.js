@@ -2,13 +2,10 @@ const axios = require("axios");
 require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
-// Usamos 1.5-flash para mayor estabilidad y evitar errores 429 de cuota
+// Modelo 2.5-flash: Máxima capacidad de razonamiento para el Proyecto LN
 const MODELO = "gemini-2.5-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
 
-/**
- * Helper para limpiar el formato Markdown que a veces devuelve la IA
- */
 const limpiarJSON = (texto) => {
     try {
         return texto.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -17,7 +14,6 @@ const limpiarJSON = (texto) => {
     }
 };
 
-// Función para el Bot de WhatsApp (Texto)
 const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [], nombre = 'Usuario') => {
     try {
         // Reducimos el inventario a 20 items para no saturar la API y evitar el error 429
@@ -61,14 +57,18 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
         if (error.response && error.response.status === 429) {
-            return { esPedido: false, accion: "ninguna", payload: {}, mensaje: "Estoy procesando muchos mensajes, por favor espera unos segundos. 🤖" };
+            return { 
+                esPedido: false, 
+                accion: "ninguna", 
+                payload: {}, 
+                mensaje: "Estoy procesando muchos mensajes debido al plan gratuito. Por favor, aguardá 10 segundos y volvé a intentar. 🤖" 
+            };
         }
         console.error(`❌ Error Gemini:`, error.message);
         return { esPedido: false, accion: "ninguna", payload: {}, mensaje: "Hola! ¿En qué puedo ayudarte?" };
     }
 };
 
-// Función para analizar imágenes (Góndola)
 const analizarGondola = async (imageUrl) => {
     try {
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
