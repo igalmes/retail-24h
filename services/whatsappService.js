@@ -12,126 +12,101 @@ const sessions = {};
 const initialize = async (userId = 1) => {
     if (sessions[userId]) return sessions[userId];
 
-    console.log(`⏳ [BOT]: Iniciando instancia para usuario ${userId}...`);
-
-    const chromePath = path.join(
-        process.cwd(), 
-        '.puppeteer_cache', 
-        'chrome', 
-        'linux-147.0.7727.56', 
-        'chrome-linux64', 
-        'chrome'
-    );
+    const chromePath = path.join(process.cwd(), '.puppeteer_cache', 'chrome', 'linux-147.0.7727.56', 'chrome-linux64', 'chrome');
 
     const client = new Client({
-        authStrategy: new LocalAuth({
-            clientId: `user-session-${userId}`
-        }),
+        authStrategy: new LocalAuth({ clientId: `user-session-${userId}` }),
+        takeoverOnConflict: true,
         puppeteer: {
             headless: true,
             executablePath: fs.existsSync(chromePath) ? chromePath : undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process',
-                '--no-zygote'
-            ],
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process', '--no-zygote'],
         }
     });
 
     client.on('qr', async (qr) => {
-        console.log(`✅ [BOT]: QR GENERADO PARA USUARIO ${userId}`);
         qrcodeTerminal.generate(qr, { small: true });
-        try {
-            global.ultimoQR = await QRCodeImage.toDataURL(qr);
-        } catch (err) {
-            console.error("Error generando QR imagen:", err);
-        }
+        try { global.ultimoQR = await QRCodeImage.toDataURL(qr); } catch (e) {}
     });
 
-    client.on('ready', () => {
-        console.log(`🚀 [BOT]: WhatsApp de Usuario ${userId} conectado.`);
-        global.ultimoQR = null;
-    });
+    client.on('ready', () => { console.log(`🚀 [BOT]: WhatsApp conectado.`); });
 
     client.on('message_create', async (msg) => {
-        if (!msg.from.endsWith('@c.us')) return;
+        if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
 
-        const textoOriginal = msg.body.trim();
-        const textoLower = textoOriginal.toLowerCase();
-        
-        if (textoLower.startsWith('bot')) {
-            try {
-                const numeroWhatsApp = msg.from.replace('@c.us', '');
-                
-                // 1. Identificación de usuario
-                const usuario = await Usuario.findOne({ where: { telefono: numeroWhatsApp } });
-                const rol = usuario ? usuario.rol : 'cliente';
-                const nombre = usuario ? usuario.nombre : 'Cliente';
-
-                const consultaIA = textoOriginal.replace(/^bot\s*/i, "");
-                if (!consultaIA) return;
-
-                // 2. Obtener inventario para contexto
-                const datosDB = await Producto.findAll({
-                    attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
-                    raw: true
-                });
-
-                // 3. Procesar con Gemini
-                const respuestaIA = await geminiService.procesarChatBot(consultaIA, rol, datosDB, nombre);
-                
-                // 4. EJECUCIÓN DE ACCIONES (Solo para ADMIN/SOCIO)
-                if ((rol === 'admin' || rol === 'socio') && respuestaIA.accion !== 'ninguna') {
-                    console.log(`🛠️ Ejecutando acción DB: ${respuestaIA.accion} sobre ${respuestaIA.payload.nombre}`);
-                    
-                    try {
-                        if (respuestaIA.accion === 'crear') {
-                            await Producto.create({
-                                nombre: respuestaIA.payload.nombre,
-                                precio_actualizado: respuestaIA.payload.precio || 0,
-                                stock_actual: respuestaIA.payload.cantidad || 0
-                            });
-                        } 
-                        else if (respuestaIA.accion === 'eliminar') {
-                            await Producto.destroy({
-                                where: { nombre: respuestaIA.payload.nombre }
-                            });
-                        }
-                        else if (respuestaIA.accion === 'actualizar') {
-                            await Producto.update(
-                                { 
-                                    precio_actualizado: respuestaIA.payload.precio, 
-                                    stock_actual: respuestaIA.payload.cantidad 
-                                },
-                                { where: { nombre: respuestaIA.payload.nombre } }
-                            );
-                        }
-                    } catch (dbError) {
-                        console.error("❌ Error ejecutando en DB:", dbError);
-                        return await msg.reply("Error al intentar modificar la base de datos.");
-                    }
-                }
-
-                // 5. Enviar respuesta final
-                await msg.reply(respuestaIA.mensaje);
-
-            } catch (error) {
-                console.error("❌ Error en flujo Bot:", error);
-                await msg.reply("Lo siento, hubo un error técnico. 🤖");
+        try {
+            const numero = msg.from.replace('@c.us', '');
+            
+            // 1. Buscamos al usuario y su comercioId
+            const user = await Usuario.findOne({ where: { telefono: numero } });
+            if (!user) {
+                return await msg.reply("No estás registrado en el sistema. Contacta al administrador.");
             }
+
+            const rol = user.rol;
+            const nombre = user.nombre;
+            const comercioId = user.comercioId; // Extraemos el ID del comercio del usuario
+            const consulta = msg.body.replace(/^bot\s*/i, "");
+
+            // 2. Traemos solo los productos de SU comercio
+            const inventario = await Producto.findAll({
+                where: { comercioId: comercioId },
+                attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
+                raw: true
+            });
+
+            const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre);
+
+            // 3. EJECUCIÓN DB CON ASIGNACIÓN DE COMERCIO
+            if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
+                console.log(`🛠️ Acción: ${resIA.accion} | Producto: ${resIA.payload.nombre} | Comercio: ${comercioId}`);
+                
+                try {
+                    if (resIA.accion === 'crear') {
+                        await Producto.create({
+                            nombre: resIA.payload.nombre,
+                            precio_actualizado: resIA.payload.precio || 0,
+                            stock_actual: resIA.payload.cantidad || 0,
+                            comercioId: comercioId // CORRECCIÓN: Ahora pasamos el ID obligatorio
+                        });
+                    } 
+                    else if (resIA.accion === 'eliminar') {
+                        await Producto.destroy({ 
+                            where: { 
+                                nombre: resIA.payload.nombre,
+                                comercioId: comercioId // Seguridad: Solo borra productos de su propio comercio
+                            } 
+                        });
+                    }
+                    else if (resIA.accion === 'actualizar') {
+                        await Producto.update(
+                            { 
+                                precio_actualizado: resIA.payload.precio, 
+                                stock_actual: resIA.payload.cantidad 
+                            },
+                            { 
+                                where: { 
+                                    nombre: resIA.payload.nombre,
+                                    comercioId: comercioId 
+                                } 
+                            }
+                        );
+                    }
+                } catch (dbErr) {
+                    console.error("❌ Error en operación DB:", dbErr.message);
+                    return await msg.reply("Hubo un error al guardar los datos en tu comercio. 🤖");
+                }
+            }
+            
+            await msg.reply(resIA.mensaje);
+        } catch (err) {
+            console.error("Error general flujo bot:", err);
         }
     });
 
-    try {
-        await client.initialize();
-        sessions[userId] = client;
-        return client;
-    } catch (err) {
-        console.error(`❌ [BOT ERROR]:`, err.message);
-        throw err;
-    }
+    client.initialize().catch(err => console.error("Error inicializando:", err));
+    sessions[userId] = client;
+    return client;
 };
 
 module.exports = { initialize, sessions };
