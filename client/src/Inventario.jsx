@@ -71,18 +71,61 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         } catch (err) { alert("Error al actualizar stock"); }
     };
 
-    const manejarSeleccion = (p) => {
-        setCarrito(prev => {
-            const existe = prev.find(item => item.id === p.id);
-            if (existe) {
-                return prev.map(item => item.id === p.id ? { ...item, cantidad: item.cantidad + 1 } : item);
-            }
-            return [...prev, { ...p, cantidad: 1 }];
-        });
-    };
+<div className="cart-card" style={{ ...fontTexto }}>
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+    <p className="cart-label" style={{ margin: 0, fontWeight: '800', color: '#1e293b' }}>CARRITO</p>
+    {carrito.length > 0 && (
+      <button 
+        onClick={vaciarCarrito} 
+        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+      >
+        VACIAR TODO
+      </button>
+    )}
+  </div>
+  
+  <div className="cart-items-list" style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '10px' }}>
+    {carrito.map(item => (
+      <div key={item.id} style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        fontSize: '0.9rem', 
+        marginBottom: '6px', 
+        background: '#f1f5f9', 
+        padding: '8px', 
+        borderRadius: '6px',
+        border: '1px solid #e2e8f0'
+      }}>
+        {/* TEXTO EN NEGRITA AQUÍ */}
+        <span style={{ fontWeight: '700', color: '#0f172a' }}>
+          {item.cantidad}x {item.nombre}
+        </span>
+        
+        <button 
+          onClick={() => eliminarDelCarrito(item.id)} 
+          style={{ border: 'none', background: '#cbd5e1', color: 'white', cursor: 'pointer', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}
+        >
+          ✕
+        </button>
+      </div>
+    ))}
+  </div>
 
-    return (
-        <div className="inventory-pro" style={{ padding: '20px', ...fontTexto }}>
+  <p className="cart-label" style={{ fontWeight: '800', marginTop: '15px' }}>TOTAL VENTA</p>
+  <b className="total-price" style={{ fontFamily: "'Roboto Mono', monospace", fontSize: '1.4rem', color: '#16a34a', fontWeight: '800' }}>
+    ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
+  </b>
+  
+  <button 
+    className="btn-pay" 
+    onClick={manejarPago} 
+    disabled={carrito.length === 0 || cargando}
+    style={{ fontWeight: '800', letterSpacing: '1px', marginTop: '10px' }}
+  >
+    {cargando ? 'PROCESANDO...' : 'PAGAR AHORA'}
+  </button>
+</div>
             
             {/* MODAL PROFESIONAL DE CARGA POR IA */}
             {loteDetectado && (
