@@ -81,13 +81,14 @@ app.get('*', (req, res) => {
 // 6. ARRANQUE DEL SERVIDOR
 const startServer = async () => {
     try {
-	console.log('Intentando conectar a:', process.env.DATABASE_URL ? "URL Detectada" : "URL No definida");
+        console.log('Intentando conectar a:', process.env.DATABASE_URL ? "URL Detectada" : "URL No definida");
         await sequelize.authenticate();
         console.log('📡 Conexión con DB OK.');
         
-        // Sincronización con alter:true para actualizar columnas sin borrar datos
-        await sequelize.sync({ alter: true }); 
-        console.log('✅ Tablas sincronizadas correctamente.');
+        // Sincronización normal para evitar el error de "Too many keys"
+        // Tus datos y columnas actuales se mantienen intactos.
+        await sequelize.sync(); 
+        console.log('✅ Tablas verificadas correctamente.');
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 [READY]: Retail 24h en puerto ${PORT}`);
