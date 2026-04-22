@@ -2,24 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import Inventario from './Inventario'; 
 
-const GOOGLE_CLIENT_ID = "TU_CLIENT_ID.apps.googleusercontent.com"; 
+const GOOGLE_CLIENT_ID = "63486001099-vsqvofv817300d8vj1hsk4v7439566h6.apps.googleusercontent.com"; 
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
-  const [lista, setLista] = useState([]);
   const [carrito, setCarrito] = useState([]); 
   const [view, setView] = useState('inventario_pro');
   const [cargando, setCargando] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const [editandoNombre, setEditandoNombre] = useState(false);
   const [configComercio, setConfigComercio] = useState({
     nombre: "Retail 24h AI",
     logo: "https://via.placeholder.com/80"
   });
 
-  const API_URL = "https://tu-backend.com"; // Reemplazar por tu URL de Render/Producción
-  const logoInputRef = useRef(null);
+  // RESTAURACIÓN DE LA CONEXIÓN DINÁMICA
+  const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : window.location.origin;
 
   const logout = () => {
     localStorage.clear();
@@ -27,7 +27,6 @@ function App() {
     setUser(null);
   };
 
-  // --- LÓGICA DE PRODUCTOS ---
   const obtenerProductos = async () => {
     const tokenAct = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
@@ -42,7 +41,7 @@ function App() {
         }
       });
       const data = await res.json();
-      setLista(data.productos || []);
+      // Si la DB está ok, esto llena la lista
     } catch (error) {
       console.error("Error al pedir productos", error);
     }
@@ -68,8 +67,7 @@ function App() {
         localStorage.setItem('userEmail', data.user.email);
       }
     } catch (err) { 
-        console.error(err);
-        alert("Error de conexión"); 
+        alert("Error de conexión con el servidor"); 
     } finally { 
         setCargando(false); 
     }
@@ -129,7 +127,7 @@ function App() {
           <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario PRO</button>
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
           <div style={{ margin: '10px 0', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
-            <button className="nav-btn" style={{ color: '#25D366' }} onClick={() => window.open(`${API_URL.replace('/api', '')}/qr`, '_blank')}>💬 WhatsApp</button>
+            <button className="nav-btn" style={{ color: '#25D366' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>💬 WhatsApp</button>
           </div>
         </nav>
 

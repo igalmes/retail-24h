@@ -17,6 +17,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     const fetchProductos = async () => {
         if (!token) return;
         try {
+            // API_URL ya viene con /api desde App.jsx
             const res = await axios.get(`${API_URL}/productos`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -29,7 +30,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         }
     };
 
-    // Lógica para añadir al carrito de App.jsx
     const manejarSeleccion = (p) => {
         setCarrito(prev => {
             const existe = prev.find(item => item.id === p.id);
@@ -50,7 +50,10 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         setLoading(true);
         try {
             const res = await axios.post(`${API_URL}/productos/detectar`, formData, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+                headers: { 
+                    'Authorization': `Bearer ${token}`, 
+                    'Content-Type': 'multipart/form-data' 
+                }
             });
             if (res.data.repetidos?.length > 0) {
                 setRepetidos(res.data.repetidos);
@@ -58,8 +61,13 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                 fetchProductos();
                 if (refreshList) refreshList();
             }
-        } catch (err) { alert("Error en IA"); }
-        finally { setLoading(false); e.target.value = null; }
+        } catch (err) { 
+            console.error(err);
+            alert("Error en la detección de IA: " + (err.response?.data?.error || "Servidor inaccesible")); 
+        } finally { 
+            setLoading(false); 
+            e.target.value = null; 
+        }
     };
 
     const handleConfirmarRepetido = async (producto) => {
@@ -69,6 +77,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
             });
             setRepetidos(prev => prev.slice(1));
             fetchProductos();
+            if (refreshList) refreshList();
         } catch (err) { console.error(err); }
     };
 
@@ -77,10 +86,14 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Gestión de Inventario PRO</h1>
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                    {alertas > 0 && <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '5px 12px', borderRadius: '20px', fontWeight: 'bold', ...fontNumeros }}>⚠️ {alertas} Alertas</span>}
+                    {alertas > 0 && (
+                        <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '5px 12px', borderRadius: '20px', fontWeight: 'bold', ...fontNumeros }}>
+                           ⚠️ {alertas} Alertas de Stock
+                        </span>
+                    )}
                     <input type="file" id="upload-ia" hidden accept="image/*" onChange={handleIAUpload} disabled={loading} />
                     <label htmlFor="upload-ia" style={{ backgroundColor: '#2563eb', color: 'white', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
-                        {loading ? '⌛ Analizando...' : '📷 Escanear con IA'}
+                        {loading ? '⌛ Analizando Góndola...' : '📷 Escanear con IA'}
                     </label>
                 </div>
             </header>
@@ -97,7 +110,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {productos.map(p => {
+                        {productos.length > 0 ? productos.map(p => {
                             const margen = p.precio_actualizado - (p.precio_compra || 0);
                             const esAlerta = p.stock_actual <= (p.stock_minimo_alerta || 5);
                             const itemEnCarrito = carrito.find(item => item.id === p.id);
@@ -109,17 +122,18 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                                             onClick={() => manejarSeleccion(p)}
                                             style={{ 
                                                 backgroundColor: itemEnCarrito ? '#16a34a' : '#f1f5f9', 
-                                                border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer' 
+                                                color: itemEnCarrito ? 'white' : '#1e293b',
+                                                border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold'
                                             }}
                                         >
-                                            {itemEnCarrito ? `✅ ${itemEnCarrito.cantidad}` : '➕'}
+                                            {itemEnCarrito ? `${itemEnCarrito.cantidad}` : '＋'}
                                         </button>
                                     </td>
                                     <td style={{ padding: '15px' }}>
                                         <div style={{ fontWeight: '600' }}>{p.nombre}</div>
                                         <div style={{ fontSize: '0.75rem', color: '#64748b', ...fontNumeros }}>{p.marca} | {p.codigo_barras || 'Sin EAN'}</div>
                                     </td>
-                                    <td style={{ padding: '15px', fontWeight: 'bold', ...fontNumeros }}>{p.stock_actual}</td>
+                                    <td style={{ padding: '15px', fontWeight: 'bold', color: esAlerta ? '#ef4444' : '#0f172a', ...fontNumeros }}>{p.stock_actual}</td>
                                     <td style={{ padding: '15px', fontWeight: 'bold', color: '#16a34a', ...fontNumeros }}>${p.precio_actualizado}</td>
                                     <td style={{ padding: '15px' }}>
                                         <span style={{ backgroundColor: margen > 0 ? '#dcfce7' : '#f1f5f9', color: margen > 0 ? '#166534' : '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', ...fontNumeros }}>
@@ -128,18 +142,25 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                                     </td>
                                 </tr>
                             );
-                        })}
+                        }) : (
+                            <tr>
+                                <td colSpan="5" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                                    No hay productos en el inventario. ¡Escaneá una imagen para empezar!
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
 
             {repetidos.length > 0 && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
                     <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '16px', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
-                        <h2>Producto ya existente</h2>
-                        <p>Detectamos <b>{repetidos[0].nombre}</b>. ¿Actualizar?</p>
-                        <button onClick={() => handleConfirmarRepetido(repetidos[0])} style={{ backgroundColor: '#2563eb', color: 'white', padding: '12px', borderRadius: '8px', width: '100%', marginBottom: '10px', cursor: 'pointer', border: 'none' }}>Sumar Stock</button>
-                        <button onClick={() => setRepetidos(prev => prev.slice(1))} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Ignorar</button>
+                        <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📦</div>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '10px', color: '#c2410c' }}>Producto ya existente</h2>
+                        <p style={{ color: '#4b5563', marginBottom: '20px' }}>Detectamos <b>{repetidos[0].nombre}</b>. ¿Qué deseas hacer?</p>
+                        <button onClick={() => handleConfirmarRepetido(repetidos[0])} style={{ backgroundColor: '#2563eb', color: 'white', padding: '12px', borderRadius: '8px', width: '100%', marginBottom: '10px', cursor: 'pointer', border: 'none', fontWeight: 'bold' }}>Sumar Stock y Actualizar Precio</button>
+                        <button onClick={() => setRepetidos(prev => prev.slice(1))} style={{ background: '#f3f4f6', border: 'none', padding: '12px', borderRadius: '8px', width: '100%', cursor: 'pointer' }}>Ignorar</button>
                     </div>
                 </div>
             )}
