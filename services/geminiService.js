@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
 // Mantenemos el modelo flash para velocidad de respuesta en WhatsApp
-const MODELO = "gemini-2.0-flash"; 
+const MODELO = "gemini-2.5-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
 
 /**
