@@ -118,7 +118,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <form onSubmit={guardarProductoCompleto} style={{ background: 'white', padding: '30px', borderRadius: '15px', width: '400px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
                         <h2 style={{ marginBottom: '20px' }}>{editandoProd.id ? 'Editar Producto' : 'Nuevo Producto'}</h2>
-                        <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.8rem', color: '#64748b' }}>Nombre</label>
+                        <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.8rem', color: '#1c1c1c' }}>Nombre</label>
                         <input type="text" value={editandoProd.nombre} onChange={e => setEditandoProd({...editandoProd, nombre: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} required />
                         
                         <div style={{ display: 'flex', gap: '10px' }}>
@@ -134,7 +134,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             <button type="submit" style={{ flex: 1, background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>GUARDAR</button>
-                            <button type="button" onClick={() => setModalAbierto(false)} style={{ flex: 1, background: '#f1f5f9', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer' }}>CANCELAR</button>
+                            <button type="button" onClick={() => setModalAbierto(false)} style={{ flex: 1, background: '#1c1c1c', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer' }}>CANCELAR</button>
                         </div>
                     </form>
                 </div>
