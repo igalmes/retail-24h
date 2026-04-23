@@ -16,8 +16,6 @@ function App() {
     logo: "https://via.placeholder.com/80"
   });
 
-
-
   const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
     : window.location.origin;
@@ -131,7 +129,6 @@ function App() {
           <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario</button>
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
           
-          {/* Vínculo al Bot de WhatsApp */}
           <div style={{ marginTop: '20px', borderTop: '1px solid #334155', paddingTop: '10px' }}>
             <button className="nav-btn" style={{ color: '#22c55e' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>
               🟢 Conectar Bot
@@ -139,7 +136,6 @@ function App() {
           </div>
         </nav>
 
-        {/* LISTADO DEL CARRITO */}
         <div className="cart-card" style={{ background: '#1e293b', padding: '15px', borderRadius: '12px', marginTop: 'auto', maxHeight: '350px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
             <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: '800' }}>CARRITO ({carrito.length})</span>
@@ -156,21 +152,20 @@ function App() {
           </div>
 
           <b className="font-numeric" style={{ color: '#fff', fontSize: '1.2rem', textAlign: 'right', display: 'block' }}>
-  Total: ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
-</b>
             Total: ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
           </b>
+
           <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ width: '100%', marginTop: '10px', background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: '800' }}>
             {cargando ? 'PROCESANDO...' : 'PAGAR'}
           </button>
         </div>
 
-        <button onClick={logout} style={{ width: '100%', marginTop: '10px', background: 'transparent', color: '#94a3b8', border: '1px solid #475569', borderRadius: '8px', padding: '8px' }}>Cerrar Sesión</button>
+        <button onClick={logout} style={{ width: '100%', marginTop: '10px', background: 'transparent', color: '#94a3b8', border: '1px solid #475569', borderRadius: '8px', padding: '8px', cursor: 'pointer' }}>Cerrar Sesión</button>
       </aside>
 
       <main className="content">
         <header style={{ background: '#ffffff', padding: '15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0' }}>
-          <button onClick={() => setMenuAbierto(!menuAbierto)} style={{ fontSize: '1.5rem', background: 'none', border: 'none' }}>☰</button>
+          <button onClick={() => setMenuAbierto(!menuAbierto)} style={{ fontSize: '1.5rem', background: 'none', border: 'none', cursor: 'pointer' }}>☰</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontWeight: '700' }}>{user?.nombre || 'Administrador'}</span>
             <div style={{ backgroundImage: `url(${configComercio.logo})`, width: '35px', height: '35px', borderRadius: '50%', backgroundSize: 'cover' }}></div>
