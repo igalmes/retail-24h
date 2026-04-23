@@ -104,8 +104,11 @@ function App() {
       });
       const data = await res.json();
       if (data.init_point) window.location.href = data.init_point;
-    } catch (err) { alert("Error al conectar con Mercado Pago"); }
-    finally { setCargando(false); }
+    } catch (err) { 
+      alert("Error al conectar con Mercado Pago"); 
+    } finally { 
+      setCargando(false); 
+    }
   };
 
   if (!token) {
