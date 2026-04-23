@@ -155,7 +155,9 @@ function App() {
             ))}
           </div>
 
-          <b style={{ ...fontNumeros, color: '#fff', fontSize: '1.2rem', textAlign: 'right', display: 'block' }}>
+          <b className="font-numeric" style={{ color: '#fff', fontSize: '1.2rem', textAlign: 'right', display: 'block' }}>
+  Total: ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
+</b>
             Total: ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
           </b>
           <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ width: '100%', marginTop: '10px', background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: '800' }}>
