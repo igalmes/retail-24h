@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import Inventario from './Inventario'; 
 
-const GOOGLE_CLIENT_ID = "63486001099-vsqvofv817300d8vj1hsk4v7439566h6.apps.googleusercontent.com"; 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID; 
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
