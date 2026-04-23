@@ -2,61 +2,42 @@ const axios = require("axios");
 require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
-// Modelo 2.5-flash: Máxima capacidad de razonamiento para el Proyecto LN
 const MODELO = "gemini-2.5-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
 
 const limpiarJSON = (texto) => {
     try {
         return texto.replace(/```json/g, "").replace(/```/g, "").trim();
-    } catch (e) {
-        return texto;
-    }
+    } catch (e) { return texto; }
 };
 
 const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [], nombre = 'Usuario') => {
     try {
-        // Reducimos el inventario a 20 items para no saturar la API y evitar el error 429
+        console.log(`[DEBUG-IA]: Generando respuesta para ${nombre}. Mensaje: "${mensajeUsuario}"`);
+
         const stockResumido = inventario.length > 0 
             ? inventario.slice(0, 20).map(p => `- ${p.nombre}: $${p.precio_actualizado} (Stock: ${p.stock_actual})`).join('\n')
-            : "No hay productos cargados actualmente.";
+            : "No hay productos cargados.";
 
-        const systemPrompt = `
-        Eres el asistente de "Retail 24h AI". Estás hablando con ${nombre} (Rol: ${rol.toUpperCase()}).
-        
-        INSTRUCCIONES DE ACCIÓN:
-        - Si el rol es ADMIN o SOCIO y el usuario quiere:
-            1. AGREGAR/AÑADIR: Usa accion "crear". Extrae nombre, precio y cantidad.
-            2. ELIMINAR/BORRAR: Usa accion "eliminar". Identifica el nombre exacto del producto del inventario.
-            3. MODIFICAR/ACTUALIZAR: Usa accion "actualizar".
-        - Si no hay una instrucción clara de cambio, usa accion "ninguna".
-        
-        INVENTARIO REAL ACTUAL (Muestra limitada):
-        ${stockResumido}
-        
-        REGLAS DE RESPUESTA:
-        Responde ESTRICTAMENTE en JSON con este formato:
-        {
-          "esPedido": boolean,
-          "accion": "crear" | "eliminar" | "actualizar" | "ninguna",
-          "payload": { "nombre": "nombre del producto", "cantidad": 0, "precio": 0 },
-          "mensaje": "Tu respuesta amable al usuario confirmando lo que hiciste o respondiendo su duda"
-        }
-        `;
+        const systemPrompt = `Eres el asistente de "Retail 24h AI". Rol Usuario: ${rol.toUpperCase()}.
+        Acciones ADMIN/SOCIO: "crear", "eliminar", "actualizar".
+        Inventario: ${stockResumido}
+        Responde ESTRICTAMENTE en JSON: {"esPedido":boolean,"accion":"...","payload":{},"mensaje":"..."}`;
 
         const payload = {
-            contents: [{
-                parts: [{
-                    text: `${systemPrompt}\n\nMensaje del usuario: "${mensajeUsuario}"`
-                }]
-            }]
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nUsuario: "${mensajeUsuario}"` }] }]
         };
 
         const result = await axios.post(url, payload);
+        
+        // Log de éxito
         const rawText = result.data.candidates[0].content.parts[0].text;
+        console.log(`[DEBUG-IA]: Respuesta cruda de Gemini recibida.`);
+
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
         if (error.response && error.response.status === 429) {
+            console.error(`[ALERTA-429]: Gemini alcanzó el límite de cuota.`);
             return { 
                 esPedido: false, 
                 accion: "ninguna", 
@@ -64,20 +45,21 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
                 mensaje: "Estoy procesando muchos mensajes debido al plan gratuito. Por favor, aguardá 10 segundos y volvé a intentar. 🤖" 
             };
         }
-        console.error(`❌ Error Gemini:`, error.message);
+        console.error(`[ERROR-IA]: Status: ${error.response?.status} | Msg: ${error.message}`);
         return { esPedido: false, accion: "ninguna", payload: {}, mensaje: "Hola! ¿En qué puedo ayudarte?" };
     }
 };
 
 const analizarGondola = async (imageUrl) => {
     try {
+        console.log(`[DEBUG-IA]: Analizando imagen de góndola...`);
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Data = Buffer.from(responseImage.data).toString('base64');
 
         const payload = {
             contents: [{
                 parts: [
-                    { text: "Analiza esta imagen de góndola. Busca productos y sus EAN-13. Devuelve estrictamente un JSON array: [{ \"nombre\": \"...\", \"ean\": \"...\", \"marca\": \"...\", \"precio_sugerido\": 0 }]. Si no hay EAN, genera uno aleatorio de 8 dígitos." },
+                    { text: "Analiza esta imagen y devuelve JSON array con productos y EAN." },
                     { inline_data: { mime_type: "image/jpeg", data: base64Data } }
                 ]
             }]
@@ -87,7 +69,7 @@ const analizarGondola = async (imageUrl) => {
         const rawText = result.data.candidates[0].content.parts[0].text;
         return JSON.parse(limpiarJSON(rawText));
     } catch (error) {
-        console.error(`❌ Error Gemini Imagen:`, error.message);
+        console.error(`[ERROR-IA-IMG]:`, error.message);
         throw error;
     }
 };
