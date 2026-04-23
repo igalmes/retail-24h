@@ -62,26 +62,14 @@ function App() {
   }, [token]);
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      setCargando(true);
-      const res = await fetch(`${API_URL}/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: credentialResponse.credential })
-      });
-      const data = await res.json();
-      if (res.ok && data.token) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userEmail', data.user.email);
-      }
-    } catch (err) { 
-        alert("Error de conexión con el servidor"); 
-    } finally { 
-        setCargando(false); 
-    }
-  };
+  try {
+    setCargando(true);
+    // Agregamos /api (o la ruta que use tu backend) antes de /auth/google
+    const res = await fetch(`${API_URL}/api/auth/google`, { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: credentialResponse.credential })
+    });
 
   const manejarPago = async () => {
     if (carrito.length === 0) return;
