@@ -16,11 +16,9 @@ function App() {
     logo: "https://via.placeholder.com/80"
   });
 
-  // Estilos según tus requerimientos
   const fontTexto = { fontFamily: "'Inter', sans-serif" };
   const fontNumeros = { fontFamily: "'Roboto Mono', monospace" };
 
-  // URL dinámica: Detecta si estamos en local o en el dominio de Render
   const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
     : window.location.origin;
@@ -43,9 +41,7 @@ function App() {
     const tokenAct = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
     if (!tokenAct) return;
-
     try {
-      // Ajustado a /api/productos según tu index.js
       const res = await fetch(`${API_URL}/api/productos`, {
         headers: {
           'Authorization': `Bearer ${tokenAct}`,
@@ -54,7 +50,6 @@ function App() {
         }
       });
       if (res.status === 401 || res.status === 403) logout();
-      await res.json(); 
     } catch (error) {
       console.error("Error al pedir productos", error);
     }
@@ -67,27 +62,22 @@ function App() {
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       setCargando(true);
-      // RUTA CRÍTICA: /api/auth/google para coincidir con el backend
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken: credentialResponse.credential })
       });
-
       const data = await res.json();
-
       if (res.ok && data.token) {
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('token', data.token);
         localStorage.setItem('userEmail', data.user.email);
-        console.log("✅ Login exitoso en el servidor");
       } else {
         alert(data.error || "Error al iniciar sesión");
       }
     } catch (err) { 
-        console.error("Error de conexión:", err);
-        alert("No se pudo conectar con el servidor"); 
+        alert("Error de conexión con el servidor"); 
     } finally { 
         setCargando(false); 
     }
@@ -127,11 +117,7 @@ function App() {
             <h1 style={{ fontWeight: '800' }}>{configComercio.nombre}</h1>
             <p style={{ marginBottom: '20px' }}>Gestión Inteligente de Inventario</p>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <GoogleLogin 
-                    onSuccess={handleGoogleSuccess} 
-                    onError={() => alert("Error en el login de Google")} 
-                    useOneTap 
-                />
+                <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => alert("Error en Google")} useOneTap />
             </div>
           </div>
         </div>
@@ -142,13 +128,11 @@ function App() {
   return (
     <div className="admin-layout" style={fontTexto}>
       {menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)}></div>}
-
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="mini-logo" style={{ backgroundImage: `url(${configComercio.logo})` }}></div>
           <span style={{ fontWeight: '800' }}>{configComercio.nombre}</span>
         </div>
-
         <nav className="sidebar-nav">
           <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>
             🚀 <span style={{ fontWeight: '700' }}>Inventario</span>
@@ -162,96 +146,41 @@ function App() {
             </button>
           </div>
         </nav>
-
         <div className="cart-card" style={{ background: '#1e293b', padding: '15px', borderRadius: '12px', marginTop: 'auto', marginBottom: '15px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p className="cart-label" style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: '800', margin: 0 }}>CARRITO</p>
-            {carrito.length > 0 && (
-              <button onClick={vaciarCarrito} style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.65rem', cursor: 'pointer', fontWeight: '700' }}>VACIAR</button>
-            )}
+            <p style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: '800', margin: 0 }}>CARRITO</p>
+            {carrito.length > 0 && <button onClick={vaciarCarrito} style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.65rem', fontWeight: '700' }}>VACIAR</button>}
           </div>
-          
-          <div className="cart-items-list" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            {carrito.length === 0 ? (
-              <p style={{ color: '#475569', fontSize: '0.8rem', textAlign: 'center' }}>Sin productos</p>
-            ) : (
-              carrito.map(item => (
-                <div key={item.id} className="cart-item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderBottom: '1px solid #334155', paddingBottom: '5px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span className="cart-item-name" style={{ color: '#fff', fontSize: '0.85rem', fontWeight: '600' }}>{item.cantidad}x {item.nombre}</span>
-                    <span className="cart-item-sub" style={{ ...fontNumeros, color: '#22c55e', fontSize: '1rem' }}>${(item.precio_actualizado * item.cantidad).toLocaleString()}</span>
-                  </div>
-                  <button onClick={() => eliminarDelCarrito(item.id)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>✕</button>
-                </div>
-              ))
-            )}
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            {carrito.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#fff', fontSize: '0.85rem' }}>{item.cantidad}x {item.nombre}</span>
+                <button onClick={() => eliminarDelCarrito(item.id)} style={{ background: 'transparent', border: 'none', color: '#64748b' }}>✕</button>
+              </div>
+            ))}
           </div>
-
           <div style={{ marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #334155' }}>
-            <p className="cart-label" style={{ color: '#94a3b8', fontSize: '0.7rem', margin: 0 }}>TOTAL VENTA</p>
-            <b className="total-price" style={{ ...fontNumeros, color: '#fff', fontSize: '1.4rem', display: 'block' }}>
-              ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
-            </b>
-            <button 
-              className="btn-pay" 
-              onClick={manejarPago} 
-              disabled={carrito.length === 0 || cargando}
-              style={{ 
-                width: '100%', 
-                marginTop: '12px', 
-                background: carrito.length > 0 ? '#2563eb' : '#475569', 
-                color: 'white', 
-                border: 'none', 
-                padding: '12px', 
-                borderRadius: '8px', 
-                fontWeight: '800', 
-                cursor: 'pointer' 
-              }}
-            >
+            <b style={{ ...fontNumeros, color: '#fff', fontSize: '1.4rem' }}>${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}</b>
+            <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ width: '100%', marginTop: '12px', background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: '800' }}>
               {cargando ? 'PROCESANDO...' : 'CONFIRMAR PAGO'}
             </button>
           </div>
         </div>
-
-        <button className="btn-logout" onClick={logout} style={{ width: '100%', background: 'transparent', border: '1px solid #475569', color: '#94a3b8', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}>
-          Cerrar Sesión
-        </button>
+        <button onClick={logout} style={{ width: '100%', background: 'transparent', border: '1px solid #475569', color: '#94a3b8', padding: '10px', borderRadius: '8px' }}>Cerrar Sesión</button>
       </aside>
-
       <main className="content">
-        <header className="content-header" style={{ background: '#fff', padding: '15px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button className="menu-toggle" onClick={() => setMenuAbierto(!menuAbierto)} style={{ fontSize: '1.5rem', background: 'none', border: 'none', cursor: 'pointer' }}>
-              {menuAbierto ? '✕' : '☰'}
-            </button>
-            <h2 style={{ margin: 0, fontWeight: '800', color: '#0f172a' }}>{configComercio.nombre}</h2>
-          </div>
-          <div className="user-badge" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span className="d-none-mobile" style={{ fontWeight: '700', color: '#475569' }}>{user?.nombre || 'Admin'}</span>
-            <div className="avatar" style={{ backgroundImage: `url(${configComercio.logo})`, width: '35px', height: '35px', borderRadius: '50%', backgroundSize: 'cover' }}></div>
+        <header style={{ background: '#fff', padding: '15px 25px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0' }}>
+          <button onClick={() => setMenuAbierto(!menuAbierto)}>☰</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: '700' }}>{user?.nombre || 'Admin'}</span>
+            <div style={{ backgroundImage: `url(${configComercio.logo})`, width: '35px', height: '35px', borderRadius: '50%', backgroundSize: 'cover' }}></div>
           </div>
         </header>
-
-        {cargando && (
-          <div className="loading-bar-container" style={{ height: '4px', background: '#e2e8f0' }}>
-            <div className="loading-bar-fill" style={{ height: '100%', background: '#2563eb', width: '50%' }}></div>
-          </div>
-        )}
-
         <div style={{ padding: '1.5rem' }}>
           {view === 'inventario_pro' ? (
-            <Inventario 
-              token={token} 
-              API_URL={`${API_URL}/api`} 
-              refreshList={obtenerProductos}
-              carrito={carrito}
-              setCarrito={setCarrito}
-            />
+            <Inventario token={token} API_URL={`${API_URL}/api`} refreshList={obtenerProductos} carrito={carrito} setCarrito={setCarrito} />
           ) : (
-            <div className="placeholder-module" style={{ textAlign: 'center', marginTop: '100px', color: '#94a3b8' }}>
-              <h3>Módulo de {view}</h3>
-              <p>Próximamente disponible.</p>
-            </div>
+            <div style={{ textAlign: 'center', marginTop: '100px' }}><h3>Módulo de {view}</h3></div>
           )}
         </div>
       </main>
