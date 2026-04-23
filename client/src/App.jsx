@@ -16,8 +16,7 @@ function App() {
     logo: "https://via.placeholder.com/80"
   });
 
-  const fontTexto = { fontFamily: "'Inter', sans-serif" };
-  const fontNumeros = { fontFamily: "'Roboto Mono', monospace" };
+
 
   const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
@@ -108,7 +107,7 @@ function App() {
   if (!token) {
     return (
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        <div className="login-screen" style={fontTexto}>
+        <div className="login-screen">
           <div className="login-box" style={{ textAlign: 'center', padding: '2rem' }}>
             <div className="login-logo" style={{ backgroundImage: `url(${configComercio.logo})`, width: '80px', height: '80px', margin: '0 auto 20px', backgroundSize: 'cover', borderRadius: '12px' }}></div>
             <h1 style={{ fontWeight: '800' }}>{configComercio.nombre}</h1>
@@ -122,7 +121,7 @@ function App() {
   }
 
   return (
-    <div className="admin-layout" style={fontTexto}>
+    <div className="admin-layout">
       {menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)}></div>}
       <aside className={`sidebar ${menuAbierto ? 'open' : ''}`}>
         <div className="sidebar-brand">
@@ -168,7 +167,7 @@ function App() {
       </aside>
 
       <main className="content">
-        <header style={{ background: '#fff', padding: '15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
+        <header style={{ background: '#ffffff', padding: '15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0' }}>
           <button onClick={() => setMenuAbierto(!menuAbierto)} style={{ fontSize: '1.5rem', background: 'none', border: 'none' }}>☰</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontWeight: '700' }}>{user?.nombre || 'Administrador'}</span>
