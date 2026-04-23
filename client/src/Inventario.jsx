@@ -5,9 +5,10 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     const [productos, setProductos] = useState([]);
     const [loteDetectado, setLoteDetectado] = useState(null); 
     const [loading, setLoading] = useState(false);
+    const [subiendoImg, setSubiendoImg] = useState(false); // Nuevo: estado para la subida tradicional
     const [busqueda, setBusqueda] = useState("");
     const [fotoExpandida, setFotoExpandida] = useState(null);
-    const [orden, setOrden] = useState("recientes"); // "recientes", "antiguos", "az", "za"
+    const [orden, setOrden] = useState("recientes");
     
     const [modalAbierto, setModalAbierto] = useState(false);
     const [editandoProd, setEditandoProd] = useState(null);
@@ -27,44 +28,57 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         } catch (err) { console.error("Error cargando DB:", err); }
     };
 
-    // Lógica de ordenamiento y filtrado
+    // Subida tradicional a Cloudinary
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('imagen', file);
+
+        try {
+            setSubiendoImg(true);
+            // Usamos el endpoint de subida que configuramos en el backend
+            const res = await axios.post(`${API_URL}/productos/upload-image`, formData, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            if (res.data.imageUrl) {
+                setEditandoProd({ ...editandoProd, imagen_url: res.data.imageUrl });
+            }
+        } catch (error) {
+            console.error("Error al subir imagen:", error);
+            alert("No se pudo subir la imagen a la nube.");
+        } finally {
+            setSubiendoImg(false);
+        }
+    };
+
     const procesarProductos = () => {
         let filtrados = productos.filter(p => 
             p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
-            p.marca.toLowerCase().includes(busqueda.toLowerCase()) ||
+            (p.marca && p.marca.toLowerCase().includes(busqueda.toLowerCase())) ||
             (p.codigo_barras && p.codigo_barras.includes(busqueda))
         );
 
         switch (orden) {
-            case "az":
-                return filtrados.sort((a, b) => a.nombre.localeCompare(b.nombre));
-            case "za":
-                return filtrados.sort((a, b) => b.nombre.localeCompare(a.nombre));
-            case "antiguos":
-                return filtrados.sort((a, b) => a.id - b.id);
-            default: // "recientes"
-                return filtrados.sort((a, b) => b.id - a.id);
+            case "az": return filtrados.sort((a, b) => a.nombre.localeCompare(b.nombre));
+            case "za": return filtrados.sort((a, b) => b.nombre.localeCompare(a.nombre));
+            case "antiguos": return filtrados.sort((a, b) => a.id - b.id);
+            default: return filtrados.sort((a, b) => b.id - a.id);
         }
     };
 
     const productosAMostrar = procesarProductos();
 
-    const eliminarProducto = async (id, nombre) => {
-        if (window.confirm(`¿Estás seguro de eliminar "${nombre}"?`)) {
-            try {
-                await axios.delete(`${API_URL}/productos/${id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                fetchProductos();
-            } catch (err) { alert("Error al eliminar"); }
-        }
-    };
-
     const abrirModal = (producto = null) => {
         if (producto) {
             setEditandoProd({ ...producto });
         } else {
-            setEditandoProd({ nombre: '', marca: '', codigo_barras: '', stock_actual: 0, precio_actualizado: 0, precio_compra: 0 });
+            setEditandoProd({ nombre: '', marca: '', codigo_barras: '', stock_actual: 0, precio_actualizado: 0, precio_compra: 0, imagen_url: '' });
         }
         setModalAbierto(true);
     };
@@ -112,17 +126,47 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     return (
         <div className="inventory-pro" style={{ padding: '20px' }}>
             
-            {/* MODAL SIMPLIFICADO (Estilos ahora en App.css) */}
+            {/* MODAL DE EDICIÓN ACTUALIZADO */}
             {modalAbierto && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <form onSubmit={guardarProductoCompleto} style={{ background: 'white', padding: '30px', borderRadius: '15px', width: '400px' }}>
-                        <h2 style={{ marginBottom: '20px', color: '#111' }}>{editandoProd.id ? 'Editar Producto' : 'Nuevo Producto'}</h2>
-                        <input type="text" placeholder="Nombre" value={editandoProd.nombre} onChange={e => setEditandoProd({...editandoProd, nombre: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} required />
+                    <form onSubmit={guardarProductoCompleto} style={{ background: 'white', padding: '30px', borderRadius: '15px', width: '420px' }}>
+                        <h2 style={{ marginBottom: '20px', color: '#111', fontWeight: '800' }}>{editandoProd.id ? 'Editar Producto' : 'Nuevo Producto'}</h2>
+                        
+                        <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>NOMBRE DEL PRODUCTO</label>
+                        <input type="text" value={editandoProd.nombre} onChange={e => setEditandoProd({...editandoProd, nombre: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} required />
+                        
                         <div style={{ display: 'flex', gap: '10px' }}>
-                            <input type="number" placeholder="Stock" value={editandoProd.stock_actual} onChange={e => setEditandoProd({...editandoProd, stock_actual: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
-                            <input type="number" placeholder="Precio" value={editandoProd.precio_actualizado} onChange={e => setEditandoProd({...editandoProd, precio_actualizado: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
+                            <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>STOCK</label>
+                                <input type="number" value={editandoProd.stock_actual} onChange={e => setEditandoProd({...editandoProd, stock_actual: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>PRECIO</label>
+                                <input type="number" className="font-numeric" value={editandoProd.precio_actualizado} onChange={e => setEditandoProd({...editandoProd, precio_actualizado: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+
+                        {/* SECCIÓN DE SUBIDA TRADICIONAL */}
+                        <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px dashed #cbd5e1', marginBottom: '20px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '10px' }}>IMAGEN (TRADICIONAL)</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                {editandoProd.imagen_url ? (
+                                    <img src={editandoProd.imagen_url} alt="Preview" style={{ width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover' }} />
+                                ) : (
+                                    <div style={{ width: '50px', height: '50px', background: '#e2e8f0', borderRadius: '6px' }}></div>
+                                )}
+                                <input type="file" id="tradizional-upload" hidden onChange={handleFileUpload} accept="image/*" />
+                                <button 
+                                    type="button" 
+                                    onClick={() => document.getElementById('tradizional-upload').click()}
+                                    style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}
+                                >
+                                    {subiendoImg ? 'Subiendo...' : '📁 Elegir Archivo'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
                             <button type="submit" style={{ flex: 1, background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>GUARDAR</button>
                             <button type="button" onClick={() => setModalAbierto(false)} style={{ flex: 1, background: '#1c1c1c', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer' }}>CANCELAR</button>
                         </div>
@@ -130,6 +174,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                 </div>
             )}
 
+            {/* Galería expandida */}
             {fotoExpandida && (
                 <div onClick={() => setFotoExpandida(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
                     <img src={fotoExpandida} style={{ maxHeight: '90vh', maxWidth: '90vw', borderRadius: '12px' }} alt="zoom" />
@@ -143,7 +188,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {/* Select de Ordenamiento */}
                     <select 
                         value={orden} 
                         onChange={(e) => setOrden(e.target.value)}
