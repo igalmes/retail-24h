@@ -1,4 +1,4 @@
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'); // Añadido MessageMedia
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCodeImage = require('qrcode'); 
 const path = require('path');
@@ -8,6 +8,7 @@ const geminiService = require('./geminiService');
 const Usuario = require('../models/Usuario');
 
 const sessions = {};
+let qrImpreso = false; // Flag para controlar que el QR no sature los logs de Render
 
 const initialize = async (userId = 1) => {
     if (sessions[userId]) return sessions[userId];
@@ -24,12 +25,31 @@ const initialize = async (userId = 1) => {
         }
     });
 
+    // Evento QR: Solo se imprime en consola una vez por sesión/reinicio
     client.on('qr', async (qr) => {
-        qrcodeTerminal.generate(qr, { small: true });
-        try { global.ultimoQR = await QRCodeImage.toDataURL(qr); } catch (e) {}
+        if (!qrImpreso) {
+            console.log("=== NUEVO QR GENERADO (Escanealo para conectar) ===");
+            qrcodeTerminal.generate(qr, { small: true });
+            qrImpreso = true; 
+        }
+        
+        try { 
+            global.ultimoQR = await QRCodeImage.toDataURL(qr); 
+        } catch (e) {
+            console.error("Error generando DataURL del QR");
+        }
     });
 
-    client.on('ready', () => { console.log(`🚀 [BOT]: WhatsApp conectado y escuchando.`); });
+    client.on('ready', () => { 
+        console.log(`🚀 [BOT]: WhatsApp conectado y escuchando.`); 
+        qrImpreso = false; // Reseteamos por si en algún momento se pierde la sesión
+        global.ultimoQR = null; 
+    });
+
+    client.on('authenticated', () => {
+        console.log("✅ [BOT]: Autenticado correctamente.");
+        qrImpreso = true; 
+    });
 
     client.on('message_create', async (msg) => {
         if (msg.body.toLowerCase().startsWith('bot')) {
@@ -52,7 +72,6 @@ const initialize = async (userId = 1) => {
 
             console.log(`[WA-PROC]: Procesando consulta para ${nombre} (Comercio ID: ${comercioId})`);
 
-            // Obtenemos el inventario incluyendo el campo imagen para que el Bot pueda usarlo
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
                 attributes: ['nombre', 'precio_actualizado', 'stock_actual', 'imagen_url'], 
@@ -96,17 +115,17 @@ const initialize = async (userId = 1) => {
             }
             
             // --- LÓGICA DE ENVÍO DE IMAGEN ---
-            // Si la IA está respondiendo sobre un producto específico y ese producto tiene imagen
             if (resIA.payload && resIA.payload.nombre) {
                 const prodConImagen = inventario.find(p => 
-                    p.nombre.toLowerCase() === resIA.payload.nombre.toLowerCase() && p.imagen
+                    p.nombre.toLowerCase() === resIA.payload.nombre.toLowerCase() && p.imagen_url
                 );
 
-                if (prodConImagen && prodConImagen.imagen) {
+                if (prodConImagen && prodConImagen.imagen_url) {
                     try {
-                        const media = await MessageMedia.fromUrl(prodConImagen.imagen);
+                        // Cambiado de .imagen a .imagen_url para coincidir con tu modelo
+                        const media = await MessageMedia.fromUrl(prodConImagen.imagen_url);
                         await client.sendMessage(msg.from, media, { caption: resIA.mensaje });
-                        return; // Salimos para no enviar el reply de texto duplicado
+                        return; 
                     } catch (imgErr) {
                         console.error("[WA-IMG-ERROR]: Error al cargar imagen de Cloudinary", imgErr.message);
                     }
