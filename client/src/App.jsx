@@ -76,11 +76,8 @@ function App() {
       } else {
         alert(data.error || "Error al iniciar sesión");
       }
-    } catch (err) { 
-        alert("Error de conexión"); 
-    } finally { 
-        setCargando(false); 
-    }
+    } catch (err) { alert("Error de conexión"); } 
+    finally { setCargando(false); }
   };
 
   const manejarPago = async () => {
@@ -104,11 +101,8 @@ function App() {
       });
       const data = await res.json();
       if (data.init_point) window.location.href = data.init_point;
-    } catch (err) { 
-      alert("Error con Mercado Pago"); 
-    } finally { 
-      setCargando(false); 
-    }
+    } catch (err) { alert("Error con Mercado Pago"); } 
+    finally { setCargando(false); }
   };
 
   if (!token) {
@@ -137,27 +131,55 @@ function App() {
         <nav className="sidebar-nav">
           <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario</button>
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
+          
+          {/* Vínculo al Bot de WhatsApp */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid #334155', paddingTop: '10px' }}>
+            <button className="nav-btn" style={{ color: '#22c55e' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>
+              🟢 Conectar Bot
+            </button>
+          </div>
         </nav>
-        <div className="cart-card" style={{ background: '#1e293b', padding: '15px', borderRadius: '12px', marginTop: 'auto' }}>
-          <b style={{ ...fontNumeros, color: '#fff', fontSize: '1.2rem' }}>
+
+        {/* LISTADO DEL CARRITO */}
+        <div className="cart-card" style={{ background: '#1e293b', padding: '15px', borderRadius: '12px', marginTop: 'auto', maxHeight: '350px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: '800' }}>CARRITO ({carrito.length})</span>
+            {carrito.length > 0 && <button onClick={vaciarCarrito} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.7rem' }}>Vaciar</button>}
+          </div>
+          
+          <div style={{ overflowY: 'auto', flexGrow: 1, marginBottom: '10px' }}>
+            {carrito.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', color: 'white', fontSize: '0.85rem', marginBottom: '5px', paddingBottom: '5px', borderBottom: '1px solid #334155' }}>
+                <span>{item.cantidad}x {item.nombre}</span>
+                <button onClick={() => eliminarDelCarrito(item.id)} style={{ background: 'none', border: 'none', color: '#64748b' }}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          <b style={{ ...fontNumeros, color: '#fff', fontSize: '1.2rem', textAlign: 'right', display: 'block' }}>
             Total: ${carrito.reduce((acc, p) => acc + (p.precio_actualizado * p.cantidad), 0).toLocaleString()}
           </b>
-          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ width: '100%', marginTop: '10px', background: '#2563eb', color: 'white', border: 'none', padding: '10px', borderRadius: '8px' }}>
-            {cargando ? '...' : 'PAGAR'}
+          <button className="btn-pay" onClick={manejarPago} disabled={carrito.length === 0 || cargando} style={{ width: '100%', marginTop: '10px', background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: '800' }}>
+            {cargando ? 'PROCESANDO...' : 'PAGAR'}
           </button>
         </div>
-        <button onClick={logout} style={{ width: '100%', marginTop: '10px', background: 'transparent', color: '#94a3b8', border: '1px solid #475569', borderRadius: '8px', padding: '5px' }}>Salir</button>
+
+        <button onClick={logout} style={{ width: '100%', marginTop: '10px', background: 'transparent', color: '#94a3b8', border: '1px solid #475569', borderRadius: '8px', padding: '8px' }}>Cerrar Sesión</button>
       </aside>
+
       <main className="content">
-        <header style={{ background: '#fff', padding: '15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0' }}>
-          <button onClick={() => setMenuAbierto(!menuAbierto)}>☰</button>
-          <span style={{ fontWeight: '700' }}>{user?.nombre || 'Admin'}</span>
+        <header style={{ background: '#fff', padding: '15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
+          <button onClick={() => setMenuAbierto(!menuAbierto)} style={{ fontSize: '1.5rem', background: 'none', border: 'none' }}>☰</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: '700' }}>{user?.nombre || 'Administrador'}</span>
+            <div style={{ backgroundImage: `url(${configComercio.logo})`, width: '35px', height: '35px', borderRadius: '50%', backgroundSize: 'cover' }}></div>
+          </div>
         </header>
         <div style={{ padding: '1.5rem' }}>
           {view === 'inventario_pro' ? (
             <Inventario token={token} API_URL={`${API_URL}/api`} refreshList={obtenerProductos} carrito={carrito} setCarrito={setCarrito} />
           ) : (
-            <div style={{ textAlign: 'center' }}><h3>Módulo de {view}</h3></div>
+            <div style={{ textAlign: 'center', marginTop: '50px' }}><h3>Módulo de {view} en desarrollo</h3></div>
           )}
         </div>
       </main>
