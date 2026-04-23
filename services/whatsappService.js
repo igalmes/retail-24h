@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'); // Añadido MessageMedia
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCodeImage = require('qrcode'); 
 const path = require('path');
@@ -32,7 +32,6 @@ const initialize = async (userId = 1) => {
     client.on('ready', () => { console.log(`🚀 [BOT]: WhatsApp conectado y escuchando.`); });
 
     client.on('message_create', async (msg) => {
-        // Log básico de entrada para saber si el servidor recibe el mensaje
         if (msg.body.toLowerCase().startsWith('bot')) {
             console.log(`[WA-IN]: Mensaje detectado de ${msg.from}: "${msg.body}"`);
         }
@@ -53,18 +52,19 @@ const initialize = async (userId = 1) => {
 
             console.log(`[WA-PROC]: Procesando consulta para ${nombre} (Comercio ID: ${comercioId})`);
 
+            // Obtenemos el inventario incluyendo el campo imagen para que el Bot pueda usarlo
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
-                attributes: ['nombre', 'precio_actualizado', 'stock_actual'],
+                attributes: ['nombre', 'precio_actualizado', 'stock_actual', 'imagen_url'], 
                 raw: true
             });
 
             // Llamada a Gemini
             const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre);
 
-            // Log de la decisión de la IA
             console.log(`[WA-IA-DECISION]: Accion: ${resIA.accion} | Payload: ${JSON.stringify(resIA.payload)}`);
 
+            // Lógica de DB (Crear, Eliminar, Actualizar)
             if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
                 try {
                     if (resIA.accion === 'crear') {
@@ -78,10 +78,10 @@ const initialize = async (userId = 1) => {
                         console.log(`[WA-DB]: Producto "${resIA.payload.nombre}" CREADO.`);
                     } 
                     else if (resIA.accion === 'eliminar') {
-                        const deleted = await Producto.destroy({ 
+                        await Producto.destroy({ 
                             where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
                         });
-                        console.log(`[WA-DB]: Producto "${resIA.payload.nombre}" ELIMINADO (${deleted}).`);
+                        console.log(`[WA-DB]: Producto "${resIA.payload.nombre}" ELIMINADO.`);
                     }
                     else if (resIA.accion === 'actualizar') {
                         await Producto.update(
@@ -95,7 +95,27 @@ const initialize = async (userId = 1) => {
                 }
             }
             
+            // --- LÓGICA DE ENVÍO DE IMAGEN ---
+            // Si la IA está respondiendo sobre un producto específico y ese producto tiene imagen
+            if (resIA.payload && resIA.payload.nombre) {
+                const prodConImagen = inventario.find(p => 
+                    p.nombre.toLowerCase() === resIA.payload.nombre.toLowerCase() && p.imagen
+                );
+
+                if (prodConImagen && prodConImagen.imagen) {
+                    try {
+                        const media = await MessageMedia.fromUrl(prodConImagen.imagen);
+                        await client.sendMessage(msg.from, media, { caption: resIA.mensaje });
+                        return; // Salimos para no enviar el reply de texto duplicado
+                    } catch (imgErr) {
+                        console.error("[WA-IMG-ERROR]: Error al cargar imagen de Cloudinary", imgErr.message);
+                    }
+                }
+            }
+
+            // Si no hubo imagen o falló, enviamos solo texto
             await msg.reply(resIA.mensaje);
+
         } catch (err) {
             console.error("[WA-CRITICAL]:", err.message);
         }
