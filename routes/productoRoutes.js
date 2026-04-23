@@ -48,7 +48,7 @@ router.use(authMiddleware);
 // --- RUTAS ---
 
 // IA: Escaneo y detección de productos mediante imagen
-router.post('/detectar', (req, res, next) => {
+router.post('/detectar-lote', (req, res, next) => {
   upload.single('imagen')(req, res, (err) => {
     if (err) {
       console.error("Error Multer/Cloudinary:", err.message);
@@ -57,6 +57,8 @@ router.post('/detectar', (req, res, next) => {
     next();
   });
 }, productoController.detectarYGuardar);
+
+
 
 // Obtener inventario completo del usuario logueado
 router.get('/', productoController.obtenerTodos);
@@ -72,5 +74,7 @@ router.delete('/:id', productoController.eliminar);
 
 // Ajuste de stock (Utilizado por el bot de WhatsApp o integraciones)
 router.put('/stock/:ean', productoController.ajustarStock);
+
+router.post('/confirmar-repetido', productoController.confirmarRepetido);
 
 module.exports = router;
