@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const verifyToken = require('./middleware/auth');
 const pagoRoutes = require('./routes/pagoRoutes');
 const configRoutes = require('./routes/configRoutes');
+app.set('trust proxy', 1);
 
 const app = express();
 const PORT = process.env.PORT || 10000;

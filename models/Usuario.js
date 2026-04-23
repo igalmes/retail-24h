@@ -14,20 +14,22 @@ const Usuario = sequelize.define('Usuario', {
     },
     password: { 
         type: DataTypes.STRING, 
-        allowNull: false 
+        allowNull: true // CAMBIO: Permitimos null para usuarios de Google
     },
-    rol: { 
-        // ENUM actualizado para soportar la jerarquía de tu sistema
-        type: DataTypes.ENUM('admin', 'empleado', 'socio', 'cliente'), 
-        defaultValue: 'cliente' 
-    },
-    telefono: {
-        // Campo vital para que el bot de WhatsApp identifique al remitente
+    googleId: { 
         type: DataTypes.STRING,
         unique: true,
         allowNull: true
     },
-    // Relación con la tabla Comercios para el multi-tenancy del SaaS
+    rol: { 
+        type: DataTypes.ENUM('admin', 'empleado', 'socio', 'cliente'), 
+        defaultValue: 'cliente' 
+    },
+    telefono: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: true
+    },
     comercioId: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -53,7 +55,7 @@ const Usuario = sequelize.define('Usuario', {
         defaultValue: 'activo'
     }
 }, {
-    tableName: 'Usuarios', // Mantenemos coincidencia exacta con MySQL Workbench
+    tableName: 'Usuarios',
     hooks: {
         beforeCreate: async (user) => {
             if (user.password) {
@@ -61,9 +63,8 @@ const Usuario = sequelize.define('Usuario', {
                 user.password = await bcrypt.hash(user.password, salt);
             }
         },
-        // Agregamos beforeUpdate por si cambias la contraseña en el futuro
         beforeUpdate: async (user) => {
-            if (user.changed('password')) {
+            if (user.changed('password') && user.password) {
                 const salt = await bcrypt.genSalt(10);
                 user.password = await bcrypt.hash(user.password, salt);
             }
@@ -71,8 +72,8 @@ const Usuario = sequelize.define('Usuario', {
     }
 });
 
-// Método para verificar la contraseña en el login
 Usuario.prototype.validPassword = async function(password) {
+    if (!this.password) return false;
     return await bcrypt.compare(password, this.password);
 };
 
