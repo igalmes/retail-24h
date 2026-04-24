@@ -77,7 +77,7 @@ const initialize = async (userId = 1) => {
             // Traemos los productos incluyendo los nuevos atributos para que Gemini tenga contexto
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
-                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'imagen_url'], 
+                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'imagen_url','precio_sugerido','codigo_barras'], 
                 raw: true
             });
 

@@ -55,7 +55,7 @@ const Usuario = sequelize.define('Usuario', {
         defaultValue: 'activo'
     }
 }, {
-    tableName: 'Usuarios',
+    tableName: 'usuarios',
     hooks: {
         beforeCreate: async (user) => {
             if (user.password) {
