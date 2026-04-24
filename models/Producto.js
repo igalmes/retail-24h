@@ -15,26 +15,24 @@ const Producto = sequelize.define('Producto', {
     precio_compra: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
     stock_minimo_alerta: { type: DataTypes.INTEGER, defaultValue: 5 },
     proveedor: { type: DataTypes.STRING, defaultValue: 'Sin Proveedor' },
-    // NUEVO: El eje de la consulta ahora es el comercio
     comercioId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'Usuarios',
+            model: 'comercios', // Nombre de la tabla en MySQL
             key: 'id'
         }
     },
-    // Opcional: quién lo creó originalmente
     UsuarioId: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-            model: 'Usuarios',
+            model: 'usuarios', // Nombre de la tabla en MySQL
             key: 'id'
         }
     }
 }, {
-    tableName: 'productos', // Importante: minúsculas como en tu DB
+    tableName: 'productos', 
     timestamps: true        
 });
 

@@ -2,13 +2,12 @@ const axios = require("axios");
 require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
-// Nota: v1beta es necesaria para modelos flash-2.0 o superiores en este endpoint
-const MODELO = "gemini-2.5-flash"; 
-const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${apiKey}`;
+// Usamos v1 y 1.5-flash para mayor estabilidad y evitar errores 404
+const MODELO = "gemini-1.5-flash"; 
+const url = `https://generativelanguage.googleapis.com/v1/models/${MODELO}:generateContent?key=${apiKey}`;
 
 const limpiarJSON = (texto) => {
     try {
-        // Elimina bloques de código Markdown si Gemini los incluye
         return texto.replace(/```json/g, "").replace(/```/g, "").trim();
     } catch (e) { 
         return texto; 
@@ -19,13 +18,13 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
     try {
         console.log(`[DEBUG-IA]: Generando respuesta para ${nombre} (Comercio: ${comercioId})`);
 
-        // Preparamos el resumen del inventario para el prompt
+        // Resumen del inventario con categoría para que la IA tenga contexto
         const stockResumido = inventario.length > 0 
-            ? inventario.map(p => `- ${p.nombre}: $${p.precio_actualizado} (Stock: ${p.stock_actual})`).join('\n')
+            ? inventario.map(p => `- ${p.nombre} (${p.marca || 'S/M'}): $${p.precio_actualizado} [Cat: ${p.categoria || 'General'}] (Stock: ${p.stock_actual})`).join('\n')
             : "No hay productos cargados en este comercio actualmente.";
 
         const systemPrompt = `Eres el asistente inteligente de "Retail 24h AI". 
-        Tu objetivo es ayudar en la gestión de stock y ventas.
+        Tu objetivo es gestionar stock y alertar sobre variaciones de precios (Inflación/SEPA).
 
         DATOS DEL CONTEXTO:
         - Usuario: ${nombre}
@@ -36,9 +35,10 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
         ${stockResumido}
 
         INSTRUCCIONES DE ACCIÓN:
-        1. Si el usuario pide crear, eliminar o actualizar, el "rol" debe ser ADMIN o SOCIO.
-        2. Si pide ver stock o información, responde amigablemente usando los datos del inventario.
-        3. Si el usuario solo dice "estas", confirma que estás listo para ayudar.
+        1. Para crear/actualizar productos, extrae: nombre, marca, precio, cantidad y categoria.
+        2. Si el usuario menciona cigarrillos, asigna automáticamente la categoría "Cigarrillos".
+        3. Solo ADMIN o SOCIO pueden modificar la base de datos.
+        4. Responde siempre de forma concisa y profesional.
 
         FORMATO DE RESPUESTA (ESTRICTO JSON):
         {
@@ -46,10 +46,12 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
           "accion": "crear" | "eliminar" | "actualizar" | "ninguna",
           "payload": {
             "nombre": "nombre del producto",
+            "marca": "marca del producto",
             "precio": number,
-            "cantidad": number
+            "cantidad": number,
+            "categoria": "categoría o rubro"
           },
-          "mensaje": "Tu respuesta amigable para el usuario final"
+          "mensaje": "Tu respuesta para el usuario"
         }`;
 
         const payload = {
@@ -59,7 +61,7 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
                 }] 
             }],
             generationConfig: {
-                temperature: 0.2, // Baja temperatura para respuestas más consistentes
+                temperature: 0.1, // Reducido para máxima precisión en JSON
                 topP: 0.8,
                 topK: 40
             }
@@ -83,7 +85,7 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
                 esPedido: false, 
                 accion: "ninguna", 
                 payload: {}, 
-                mensaje: "🤖 El sistema está un poco saturado por el plan gratuito. Por favor, esperá unos segundos y volvé a preguntarme." 
+                mensaje: "🤖 Sistema saturado. Por favor, aguarda unos segundos." 
             };
         }
         
@@ -92,23 +94,18 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
             esPedido: false, 
             accion: "ninguna", 
             payload: {}, 
-            mensaje: `Hola ${nombre}, tuve un problema técnico procesando tu mensaje. ¿Podrías repetirlo?` 
+            mensaje: `Hola ${nombre}, hubo un error en la conexión. ¿Podrías repetir tu solicitud?` 
         };
     }
 };
 
 const analizarGondola = async (imageUrl) => {
     try {
-        console.log(`[DEBUG-IA]: Analizando imagen de góndola...`);
-        
-        // Descargar la imagen para enviarla como base64
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Data = Buffer.from(responseImage.data).toString('base64');
 
-        const systemPrompt = `Analiza la imagen de esta góndola de supermercado. 
-        Extrae todos los productos visibles.
-        Devuelve un ARRAY de objetos JSON con este formato:
-        [{"nombre": "Nombre Producto", "marca": "Marca", "ean": "codigo_ean_o_null", "categoria": "categoria"}]`;
+        const systemPrompt = `Analiza la imagen de esta góndola. Extrae productos en JSON:
+        [{"nombre": "Nombre", "marca": "Marca", "ean": "EAN", "categoria": "Categoría"}]`;
 
         const payload = {
             contents: [{
@@ -123,7 +120,6 @@ const analizarGondola = async (imageUrl) => {
         const rawText = result.data.candidates[0].content.parts[0].text;
         
         return JSON.parse(limpiarJSON(rawText));
-
     } catch (error) {
         console.error(`[ERROR-IA-IMG]:`, error.message);
         throw error;

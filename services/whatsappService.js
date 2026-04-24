@@ -74,10 +74,10 @@ const initialize = async (userId = 1) => {
 
             console.log(`[WA-PROC]: Usuario: ${nombre} | Rol: ${rol} | Comercio: ${comercioId}`);
 
-            // Traemos solo los productos de ESTE comercio
+            // Traemos los productos incluyendo los nuevos atributos para que Gemini tenga contexto
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
-                attributes: ['nombre', 'precio_actualizado', 'stock_actual', 'imagen_url'], 
+                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'imagen_url'], 
                 raw: true
             });
 
@@ -92,12 +92,14 @@ const initialize = async (userId = 1) => {
                     if (resIA.accion === 'crear') {
                         await Producto.create({
                             nombre: resIA.payload.nombre,
+                            marca: resIA.payload.marca || 'S/M',
+                            categoria: resIA.payload.categoria || 'General',
                             precio_actualizado: resIA.payload.precio || 0,
                             stock_actual: resIA.payload.cantidad || 0,
                             comercioId: comercioId,
                             UsuarioId: dbUsuarioId 
                         });
-                        console.log(`[WA-DB]: "${resIA.payload.nombre}" CREADO.`);
+                        console.log(`[WA-DB]: "${resIA.payload.nombre}" (${resIA.payload.marca}) CREADO en ${resIA.payload.categoria}.`);
                     } 
                     else if (resIA.accion === 'eliminar') {
                         await Producto.destroy({ 
@@ -106,8 +108,17 @@ const initialize = async (userId = 1) => {
                         console.log(`[WA-DB]: "${resIA.payload.nombre}" ELIMINADO.`);
                     }
                     else if (resIA.accion === 'actualizar') {
+                        // Construimos objeto de actualización dinámico para no pisar marca/categoría si no vienen
+                        const updateData = {
+                            precio_actualizado: resIA.payload.precio,
+                            stock_actual: resIA.payload.cantidad
+                        };
+                        
+                        if (resIA.payload.marca) updateData.marca = resIA.payload.marca;
+                        if (resIA.payload.categoria) updateData.categoria = resIA.payload.categoria;
+
                         await Producto.update(
-                            { precio_actualizado: resIA.payload.precio, stock_actual: resIA.payload.cantidad },
+                            updateData,
                             { where: { nombre: resIA.payload.nombre, comercioId: comercioId } }
                         );
                         console.log(`[WA-DB]: "${resIA.payload.nombre}" ACTUALIZADO.`);
@@ -118,7 +129,6 @@ const initialize = async (userId = 1) => {
             }
             
             // --- CONSTRUCCIÓN DE RESPUESTA PERSONALIZADA ---
-            // Siempre incluimos quién eres al principio
             const encabezado = `👤 *Usuario:* ${nombre}\n🛡️ *Rol:* ${rol.toUpperCase()}\n🏛️ *Comercio:* ${comercioId}\n\n`;
             const mensajeFinal = encabezado + resIA.mensaje;
 
