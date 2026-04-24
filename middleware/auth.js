@@ -27,7 +27,7 @@ module.exports = async (req, res, next) => {
 
                 if (userFound) {
                     req.user = userFound; // Inyectamos el usuario en la request
-                    console.log(`✅ [AUTH JWT] Usuario: ${userFound.email} (Rol: ${userFound.rol})`);
+                    //console.log(`✅ [AUTH JWT] Usuario: ${userFound.email} (Rol: ${userFound.rol})`);
                     return next(); 
                 }
             } catch (err) {

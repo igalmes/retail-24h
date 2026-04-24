@@ -42,7 +42,7 @@ const initialize = async (userId = 1) => {
 
     client.on('ready', () => { 
         console.log(`🚀 [BOT]: WhatsApp conectado y escuchando.`); 
-        qrImpreso = false; // Reseteamos por si en algún momento se pierde la sesión
+        qrImpreso = false; 
         global.ultimoQR = null; 
     });
 
@@ -52,10 +52,12 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('message_create', async (msg) => {
+        // Log de entrada
         if (msg.body.toLowerCase().startsWith('bot')) {
-            console.log(`[WA-IN]: Mensaje detectado de ${msg.from}: "${msg.body}"`);
+            console.log(`[WA-IN]: Mensaje de ${msg.from}: "${msg.body}"`);
         }
 
+        // Filtro de seguridad
         if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
 
         try {
@@ -70,20 +72,21 @@ const initialize = async (userId = 1) => {
             const { id: dbUsuarioId, rol, nombre, comercioId } = user;
             const consulta = msg.body.replace(/^bot\s*/i, "");
 
-            console.log(`[WA-PROC]: Procesando consulta para ${nombre} (Comercio ID: ${comercioId})`);
+            console.log(`[WA-PROC]: Usuario: ${nombre} | Rol: ${rol} | Comercio: ${comercioId}`);
 
+            // Traemos solo los productos de ESTE comercio
             const inventario = await Producto.findAll({
                 where: { comercioId: comercioId },
                 attributes: ['nombre', 'precio_actualizado', 'stock_actual', 'imagen_url'], 
                 raw: true
             });
 
-            // Llamada a Gemini
-            const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre);
+            // Llamada a Gemini con contexto completo
+            const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre, comercioId);
 
-            console.log(`[WA-IA-DECISION]: Accion: ${resIA.accion} | Payload: ${JSON.stringify(resIA.payload)}`);
+            console.log(`[WA-IA]: Accion: ${resIA.accion}`);
 
-            // Lógica de DB (Crear, Eliminar, Actualizar)
+            // Lógica de DB (Solo para admin/socio)
             if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
                 try {
                     if (resIA.accion === 'crear') {
@@ -94,27 +97,32 @@ const initialize = async (userId = 1) => {
                             comercioId: comercioId,
                             UsuarioId: dbUsuarioId 
                         });
-                        console.log(`[WA-DB]: Producto "${resIA.payload.nombre}" CREADO.`);
+                        console.log(`[WA-DB]: "${resIA.payload.nombre}" CREADO.`);
                     } 
                     else if (resIA.accion === 'eliminar') {
                         await Producto.destroy({ 
                             where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
                         });
-                        console.log(`[WA-DB]: Producto "${resIA.payload.nombre}" ELIMINADO.`);
+                        console.log(`[WA-DB]: "${resIA.payload.nombre}" ELIMINADO.`);
                     }
                     else if (resIA.accion === 'actualizar') {
                         await Producto.update(
                             { precio_actualizado: resIA.payload.precio, stock_actual: resIA.payload.cantidad },
                             { where: { nombre: resIA.payload.nombre, comercioId: comercioId } }
                         );
-                        console.log(`[WA-DB]: Producto "${resIA.payload.nombre}" ACTUALIZADO.`);
+                        console.log(`[WA-DB]: "${resIA.payload.nombre}" ACTUALIZADO.`);
                     }
                 } catch (dbErr) {
                     console.error("[WA-DB-ERROR]:", dbErr.message);
                 }
             }
             
-            // --- LÓGICA DE ENVÍO DE IMAGEN ---
+            // --- CONSTRUCCIÓN DE RESPUESTA PERSONALIZADA ---
+            // Siempre incluimos quién eres al principio
+            const encabezado = `👤 *Usuario:* ${nombre}\n🛡️ *Rol:* ${rol.toUpperCase()}\n🏛️ *Comercio:* ${comercioId}\n\n`;
+            const mensajeFinal = encabezado + resIA.mensaje;
+
+            // Enviar con imagen si corresponde
             if (resIA.payload && resIA.payload.nombre) {
                 const prodConImagen = inventario.find(p => 
                     p.nombre.toLowerCase() === resIA.payload.nombre.toLowerCase() && p.imagen_url
@@ -122,18 +130,17 @@ const initialize = async (userId = 1) => {
 
                 if (prodConImagen && prodConImagen.imagen_url) {
                     try {
-                        // Cambiado de .imagen a .imagen_url para coincidir con tu modelo
                         const media = await MessageMedia.fromUrl(prodConImagen.imagen_url);
-                        await client.sendMessage(msg.from, media, { caption: resIA.mensaje });
+                        await client.sendMessage(msg.from, media, { caption: mensajeFinal });
                         return; 
                     } catch (imgErr) {
-                        console.error("[WA-IMG-ERROR]: Error al cargar imagen de Cloudinary", imgErr.message);
+                        console.error("[WA-IMG-ERROR]:", imgErr.message);
                     }
                 }
             }
 
-            // Si no hubo imagen o falló, enviamos solo texto
-            await msg.reply(resIA.mensaje);
+            // Si no hay imagen, enviar texto plano con el encabezado
+            await msg.reply(mensajeFinal);
 
         } catch (err) {
             console.error("[WA-CRITICAL]:", err.message);
