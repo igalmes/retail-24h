@@ -19,7 +19,6 @@ global.ultimoQR = null;
 app.use(cors());
 app.use(express.json());
 
-// Servir archivos estáticos del frontend (Vite genera la carpeta dist)
 const distPath = path.resolve(process.cwd(), 'client', 'dist');
 app.use('/assets', express.static(path.join(distPath, 'assets'), {
     immutable: true,
@@ -33,7 +32,6 @@ app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, pagoRoutes); 
 app.use('/api/config', verifyToken, configRoutes);
 
-// Ruta para ver el QR de WhatsApp
 app.get('/qr', (req, res) => {
     if (global.ultimoQR) {
         res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#000;"><img src="${global.ultimoQR}" style="border:10px solid white;border-radius:10px;" /></body></html>`);
@@ -42,7 +40,6 @@ app.get('/qr', (req, res) => {
     }
 });
 
-// Fallback para React (Single Page Application)
 app.get('*', (req, res) => {
     const indexPath = path.join(distPath, 'index.html');
     if (fs.existsSync(indexPath)) {
@@ -55,12 +52,13 @@ app.get('*', (req, res) => {
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-        await sequelize.sync(); 
-        console.log('✅ Base de datos conectada.');
+        // IMPORTANTE: force: false y alter: false para producción (Render)
+        // Esto evita que se borren los productos al reiniciar el server
+        await sequelize.sync({ force: false, alter: false }); 
+        console.log('✅ Base de datos conectada y estable.');
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Servidor en puerto ${PORT}`);
-            // Iniciar bot de WhatsApp con delay para evitar bloqueos en el arranque
             setTimeout(() => {
                 whatsappBot.initialize(1).catch(err => console.error("Error Bot:", err));
             }, 5000);

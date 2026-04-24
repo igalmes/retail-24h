@@ -12,10 +12,7 @@ const Usuario = sequelize.define('Usuario', {
         unique: true, 
         allowNull: false 
     },
-    password: { 
-        type: DataTypes.STRING, 
-        allowNull: true // CAMBIO: Permitimos null para usuarios de Google
-    },
+    
     googleId: { 
         type: DataTypes.STRING,
         unique: true,

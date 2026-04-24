@@ -6,33 +6,56 @@ const Producto = require('./models/Producto');
 
 async function test() {
     try {
-        console.log("⏳ Iniciando limpieza y conexión...");
+        console.log("⏳ Iniciando conexión y limpieza de seguridad...");
         
+        await sequelize.authenticate();
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
         
-        // USAREMOS FORCE TRUE SOLO ESTA VEZ PARA LIMPIAR RELACIONES BASURA
+        // Sincronizamos para asegurar que las columnas nuevas (googleId, plan, etc) existan
         await sequelize.sync({ alter: true }); 
         
-        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
-        console.log("✅ Tablas recreadas desde cero y limpias.");
+        console.log("✅ Estructura de tablas actualizada.");
 
-        // CREAMOS EL COMERCIO 1 AUTOMÁTICAMENTE PARA EVITAR ERRORES DE FK
-        console.log("🏢 Creando comercio de prueba (ID 1)...");
-        await Comercio.create({
-            id: 1,
-            nombre: 'Sucursal América Test',
-            plan: 'pro',
-            estado: 'activo'
+        // 1. Aseguramos el Comercio 1
+        console.log("🏢 Verificando Comercio ID 1...");
+        const [comercio] = await Comercio.findOrCreate({
+            where: { id: 1 },
+            defaults: {
+                nombre: 'Sucursal América Test',
+                plan: 'pro',
+                estado: 'activo'
+            }
         });
 
-        console.log("🚀 Iniciando procesamiento SEPA...");
+        // 2. Aseguramos tu Usuario Admin (Para que no se borre al sincronizar)
+        console.log("👤 Verificando Usuario Admin...");
+        await Usuario.findOrCreate({
+            where: { email: 'ignaciogalmes79@gmail.com' },
+            defaults: {
+                nombre: 'Ignacio',
+                rol: 'admin',
+                comercioId: 1,
+                plan: 'pro',
+                estado: 'activo'
+            }
+        });
+
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+
+        console.log("🚀 Iniciando procesamiento SEPA (4303 productos)...");
+        // Pasamos el ID 1 para que el service sepa a qué comercio asignar todo
         const res = await procesarDatosDiaAmerica(1);
         
-        console.log("📊 Sincronización terminada.");
+        console.log("📊 Sincronización terminada con éxito.");
+        
+        // Verificación final en consola
+        const count = await Producto.count({ where: { comercioId: 1 } });
+        console.log(`total de productos en DB para comercio 1: ${count}`);
+
         process.exit(0);
         
     } catch (e) {
-        console.error("❌ Error en el test:", e.message);
+        console.error("❌ Error crítico en el test:", e.message);
         process.exit(1);
     }
 }

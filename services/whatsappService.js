@@ -52,34 +52,45 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('message_create', async (msg) => {
-        // Log de entrada
-        if (msg.body.toLowerCase().startsWith('bot')) {
-            console.log(`[WA-IN]: Mensaje de ${msg.from}: "${msg.body}"`);
-        }
+    if (!msg.body.toLowerCase().startsWith('bot')) return;
 
-        // Filtro de seguridad
-        if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
+    try {
+        const numero = msg.from.replace('@c.us', '');
+        const user = await Usuario.findOne({ where: { telefono: numero } });
+        
+        if (!user) return;
 
-        try {
-            const numero = msg.from.replace('@c.us', '');
-            const user = await Usuario.findOne({ where: { telefono: numero } });
-            
-            if (!user) {
-                console.warn(`[WA-AUTH]: Número no registrado: ${numero}`);
-                return;
-            }
+        const { id: dbUsuarioId, rol, nombre, comercioId } = user;
+        const consulta = msg.body.replace(/^bot\s*/i, "").trim();
 
-            const { id: dbUsuarioId, rol, nombre, comercioId } = user;
-            const consulta = msg.body.replace(/^bot\s*/i, "");
+        // 🔍 PASO CLAVE: Búsqueda filtrada (Solo lo que el usuario pide)
+        const { Op } = require('sequelize');
+        const inventarioReducido = await Producto.findAll({
+            where: { 
+                comercioId: comercioId,
+                [Op.or]: [
+                    { nombre: { [Op.like]: `%${consulta.split(' ')[0]}%` } }, // Busca la primera palabra
+                    { marca: { [Op.like]: `%${consulta.split(' ')[0]}%` } }
+                ]
+            },
+            attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'precio_sugerido'],
+            limit: 15, // Suficiente para que Gemini compare
+            raw: true
+        });
 
-            console.log(`[WA-PROC]: Usuario: ${nombre} | Rol: ${rol} | Comercio: ${comercioId}`);
+        console.log(`[WA-PROC]: Enviando ${inventarioReducido.length} productos relevantes a Gemini.`);
 
-            // Traemos los productos incluyendo los nuevos atributos para que Gemini tenga contexto
-            const inventario = await Producto.findAll({
-                where: { comercioId: comercioId },
-                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'imagen_url','precio_sugerido','codigo_barras'], 
-                raw: true
-            });
+        // Llamada a Gemini con contexto REDUCIDO y EFECTIVO
+        const resIA = await geminiService.procesarChatBot(consulta, rol, inventarioReducido, nombre, comercioId);
+
+        // --- EL RESTO DE TU LÓGICA DE CREATE/UPDATE QUEDA IGUAL ---
+        const encabezado = `👤 *Usuario:* ${nombre}\n🛡️ *Rol:* ${rol.toUpperCase()}\n🏛️ *Comercio:* ${comercioId}\n\n`;
+        await msg.reply(encabezado + resIA.mensaje);
+
+    } catch (err) {
+        console.error("[WA-CRITICAL]:", err.message);
+    }
+});
 
             // Llamada a Gemini con contexto completo
             const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre, comercioId);
