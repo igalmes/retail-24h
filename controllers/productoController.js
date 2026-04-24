@@ -207,3 +207,15 @@ exports.ajustarStock = async (req, res) => {
         res.status(500).json({ error: "Error al ajustar stock" });
     }
 };
+exports.crearManual = async (req, res) => {
+    try {
+        const nuevoProd = await Producto.create({
+            ...req.body,
+            comercioId: req.user.comercioId, // Lo sacamos del token, no del body
+            UsuarioId: req.user.id
+        });
+        res.status(201).json(nuevoProd);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
