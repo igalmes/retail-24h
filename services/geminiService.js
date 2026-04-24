@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
 // Usamos v1 y 1.5-flash para mayor estabilidad y evitar errores 404
-const MODELO = "gemini-1.5-flash"; 
+const MODELO = "gemini-2.5-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1/models/${MODELO}:generateContent?key=${apiKey}`;
 
 const limpiarJSON = (texto) => {
