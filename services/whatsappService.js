@@ -3,12 +3,13 @@ const qrcodeTerminal = require('qrcode-terminal');
 const QRCodeImage = require('qrcode'); 
 const path = require('path');
 const fs = require('fs');
+const { Op } = require('sequelize'); 
 const Producto = require('../models/Producto');
 const geminiService = require('./geminiService');
 const Usuario = require('../models/Usuario');
 
 const sessions = {};
-let qrImpreso = false; // Flag para controlar que el QR no sature los logs de Render
+let qrImpreso = false; 
 
 const initialize = async (userId = 1) => {
     if (sessions[userId]) return sessions[userId];
@@ -25,7 +26,6 @@ const initialize = async (userId = 1) => {
         }
     });
 
-    // Evento QR: Solo se imprime en consola una vez por sesión/reinicio
     client.on('qr', async (qr) => {
         if (!qrImpreso) {
             console.log("=== NUEVO QR GENERADO (Escanealo para conectar) ===");
@@ -52,52 +52,46 @@ const initialize = async (userId = 1) => {
     });
 
     client.on('message_create', async (msg) => {
-    if (!msg.body.toLowerCase().startsWith('bot')) return;
+        // Filtro inicial
+        if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
 
-    try {
-        const numero = msg.from.replace('@c.us', '');
-        const user = await Usuario.findOne({ where: { telefono: numero } });
-        
-        if (!user) return;
+        try {
+            const numero = msg.from.replace('@c.us', '');
+            const user = await Usuario.findOne({ where: { telefono: numero } });
+            
+            if (!user) {
+                console.warn(`[WA-AUTH]: Número no registrado: ${numero}`);
+                return;
+            }
 
-        const { id: dbUsuarioId, rol, nombre, comercioId } = user;
-        const consulta = msg.body.replace(/^bot\s*/i, "").trim();
+            const { id: dbUsuarioId, rol, nombre, comercioId } = user;
+            const consulta = msg.body.replace(/^bot\s*/i, "").trim();
 
-        // 🔍 PASO CLAVE: Búsqueda filtrada (Solo lo que el usuario pide)
-        const { Op } = require('sequelize');
-        const inventarioReducido = await Producto.findAll({
-            where: { 
-                comercioId: comercioId,
-                [Op.or]: [
-                    { nombre: { [Op.like]: `%${consulta.split(' ')[0]}%` } }, // Busca la primera palabra
-                    { marca: { [Op.like]: `%${consulta.split(' ')[0]}%` } }
-                ]
-            },
-            attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'precio_sugerido'],
-            limit: 15, // Suficiente para que Gemini compare
-            raw: true
-        });
+            console.log(`[WA-PROC]: Usuario: ${nombre} | Consulta: "${consulta}"`);
 
-        console.log(`[WA-PROC]: Enviando ${inventarioReducido.length} productos relevantes a Gemini.`);
+            // 🔍 BÚSQUEDA FILTRADA (Para no saturar el contexto de Gemini)
+            // Extraemos palabras clave de la consulta para buscar coincidencias en la DB
+            const terminos = consulta.split(' ').filter(t => t.length > 2);
+            
+            const inventarioRelevante = await Producto.findAll({
+                where: { 
+                    comercioId: comercioId,
+                    [Op.or]: [
+                        { nombre: { [Op.like]: `%${terminos[0] || ''}%` } },
+                        { marca: { [Op.like]: `%${terminos[0] || ''}%` } }
+                    ]
+                },
+                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'imagen_url', 'precio_sugerido', 'codigo_barras'], 
+                limit: 20, // Enviamos solo los 20 más relevantes
+                raw: true
+            });
 
-        // Llamada a Gemini con contexto REDUCIDO y EFECTIVO
-        const resIA = await geminiService.procesarChatBot(consulta, rol, inventarioReducido, nombre, comercioId);
+            // Llamada a Gemini con el inventario filtrado
+            const resIA = await geminiService.procesarChatBot(consulta, rol, inventarioRelevante, nombre, comercioId);
 
-        // --- EL RESTO DE TU LÓGICA DE CREATE/UPDATE QUEDA IGUAL ---
-        const encabezado = `👤 *Usuario:* ${nombre}\n🛡️ *Rol:* ${rol.toUpperCase()}\n🏛️ *Comercio:* ${comercioId}\n\n`;
-        await msg.reply(encabezado + resIA.mensaje);
+            console.log(`[WA-IA]: Accion sugerida: ${resIA.accion}`);
 
-    } catch (err) {
-        console.error("[WA-CRITICAL]:", err.message);
-    }
-});
-
-            // Llamada a Gemini con contexto completo
-            const resIA = await geminiService.procesarChatBot(consulta, rol, inventario, nombre, comercioId);
-
-            console.log(`[WA-IA]: Accion: ${resIA.accion}`);
-
-            // Lógica de DB (Solo para admin/socio)
+            // Lógica de DB (Admin/Socio)
             if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
                 try {
                     if (resIA.accion === 'crear') {
@@ -110,46 +104,39 @@ const initialize = async (userId = 1) => {
                             comercioId: comercioId,
                             UsuarioId: dbUsuarioId 
                         });
-                        console.log(`[WA-DB]: "${resIA.payload.nombre}" (${resIA.payload.marca}) CREADO en ${resIA.payload.categoria}.`);
                     } 
                     else if (resIA.accion === 'eliminar') {
                         await Producto.destroy({ 
                             where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
                         });
-                        console.log(`[WA-DB]: "${resIA.payload.nombre}" ELIMINADO.`);
                     }
                     else if (resIA.accion === 'actualizar') {
-                        // Construimos objeto de actualización dinámico para no pisar marca/categoría si no vienen
                         const updateData = {
                             precio_actualizado: resIA.payload.precio,
                             stock_actual: resIA.payload.cantidad
                         };
-                        
                         if (resIA.payload.marca) updateData.marca = resIA.payload.marca;
                         if (resIA.payload.categoria) updateData.categoria = resIA.payload.categoria;
 
-                        await Producto.update(
-                            updateData,
-                            { where: { nombre: resIA.payload.nombre, comercioId: comercioId } }
-                        );
-                        console.log(`[WA-DB]: "${resIA.payload.nombre}" ACTUALIZADO.`);
+                        await Producto.update(updateData, { 
+                            where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
+                        });
                     }
                 } catch (dbErr) {
                     console.error("[WA-DB-ERROR]:", dbErr.message);
                 }
             }
             
-            // --- CONSTRUCCIÓN DE RESPUESTA PERSONALIZADA ---
             const encabezado = `👤 *Usuario:* ${nombre}\n🛡️ *Rol:* ${rol.toUpperCase()}\n🏛️ *Comercio:* ${comercioId}\n\n`;
             const mensajeFinal = encabezado + resIA.mensaje;
 
-            // Enviar con imagen si corresponde
+            // Enviar con imagen si Gemini identificó un producto específico
             if (resIA.payload && resIA.payload.nombre) {
-                const prodConImagen = inventario.find(p => 
-                    p.nombre.toLowerCase() === resIA.payload.nombre.toLowerCase() && p.imagen_url
+                const prodConImagen = inventarioRelevante.find(p => 
+                    p.nombre.toLowerCase().includes(resIA.payload.nombre.toLowerCase()) && p.imagen_url
                 );
 
-                if (prodConImagen && prodConImagen.imagen_url) {
+                if (prodConImagen) {
                     try {
                         const media = await MessageMedia.fromUrl(prodConImagen.imagen_url);
                         await client.sendMessage(msg.from, media, { caption: mensajeFinal });
@@ -160,7 +147,6 @@ const initialize = async (userId = 1) => {
                 }
             }
 
-            // Si no hay imagen, enviar texto plano con el encabezado
             await msg.reply(mensajeFinal);
 
         } catch (err) {
