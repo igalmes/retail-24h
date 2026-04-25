@@ -76,10 +76,9 @@ const initialize = async (userId = 1) => {
             const inventarioRelevante = await Producto.findAll({
     where: { 
         [Op.and]: [
-            // Filtro 1: O es del comercio del usuario, o es un dato global (id 0)
-            { comercioId: { [Op.in]: [comercioId, 0] } }, 
+            // Filtro ampliado: Tu comercio (1), SEPA (2) o Global (0)
+            { comercioId: { [Op.in]: [comercioId, 0, 2, 3] } }, 
             
-            // Filtro 2: Coincidencia de nombre o marca
             {
                 [Op.or]: [
                     { nombre: { [Op.like]: `%${terminos[0] || ''}%` } },
@@ -88,6 +87,7 @@ const initialize = async (userId = 1) => {
             }
         ]
     },
+    // ... resto del código igual
     attributes: [
         'nombre', 
         'marca', 
