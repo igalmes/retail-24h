@@ -2,7 +2,7 @@ const axios = require("axios");
 require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
-// Usamos v1 y 1.5-flash para mayor estabilidad y evitar errores 404
+// Corregido a versión estable 2.5 para evitar errores 404
 const MODELO = "gemini-2.5-flash"; 
 const url = `https://generativelanguage.googleapis.com/v1/models/${MODELO}:generateContent?key=${apiKey}`;
 
@@ -18,27 +18,31 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
     try {
         console.log(`[DEBUG-IA]: Generando respuesta para ${nombre} (Comercio: ${comercioId})`);
 
-        // Resumen del inventario con categoría para que la IA tenga contexto
+        // Mapeo detallado para que la IA sepa qué es SEPA (ID 2) y qué es local
         const stockResumido = inventario.length > 0 
-            ? inventario.map(p => `- ${p.nombre} (${p.marca || 'S/M'}): $${p.precio_actualizado} [Cat: ${p.categoria || 'General'}] (Stock: ${p.stock_actual})`).join('\n')
-            : "No hay productos cargados en este comercio actualmente.";
+            ? inventario.map(p => {
+                const origen = Number(p.comercioId) === 2 ? "[REF SEPA]" : "[LOCAL]";
+                return `- ${origen} ${p.nombre} (${p.marca || 'S/M'}): $${p.precio_actualizado} (Sugerido: $${p.precio_sugerido || 'N/A'}) [Cat: ${p.categoria || 'General'}] (Stock: ${p.stock_actual})`;
+            }).join('\n')
+            : "No se encontraron productos coincidentes en el inventario local ni en la base SEPA.";
 
         const systemPrompt = `Eres el asistente inteligente de "Retail 24h AI". 
-        Tu objetivo es gestionar stock y alertar sobre variaciones de precios (Inflación/SEPA).
+        Tu objetivo es gestionar stock y alertar sobre variaciones de precios comparando el inventario LOCAL contra la lista SEPA.
 
         DATOS DEL CONTEXTO:
-        - Usuario: ${nombre}
-        - Rol: ${rol.toUpperCase()}
-        - Comercio ID: ${comercioId}
+        - Usuario Actual: ${nombre}
+        - Rol del Usuario: ${rol.toUpperCase()}
+        - ID del Comercio Usuario: ${comercioId}
 
-        INVENTARIO DISPONIBLE:
+        INVENTARIO Y REFERENCIAS ENCONTRADAS:
         ${stockResumido}
 
         INSTRUCCIONES DE ACCIÓN:
-        1. Para crear/actualizar productos, extrae: nombre, marca, precio, cantidad y categoria.
-        2. Si el usuario menciona cigarrillos, asigna automáticamente la categoría "Cigarrillos".
-        3. Solo ADMIN o SOCIO pueden modificar la base de datos.
-        4. Responde siempre de forma concisa y profesional.
+        1. [REF SEPA]: Son precios nacionales de referencia. No se pueden modificar, solo sirven para comparar.
+        2. [LOCAL]: Es el stock real del comercio ${comercioId}. Solo ADMIN/SOCIO pueden 'crear', 'eliminar' o 'actualizar'.
+        3. Si el usuario pregunta "¿cuánto sale?" o comparaciones, prioriza mostrar la diferencia entre el LOCAL y el SEPA.
+        4. Si menciona cigarrillos, asigna categoría "Cigarrillos".
+        5. Responde siempre de forma concisa, amable y profesional.
 
         FORMATO DE RESPUESTA (ESTRICTO JSON):
         {
@@ -61,7 +65,7 @@ const procesarChatBot = async (mensajeUsuario, rol = 'cliente', inventario = [],
                 }] 
             }],
             generationConfig: {
-                temperature: 0.1, // Reducido para máxima precisión en JSON
+                temperature: 0.1, 
                 topP: 0.8,
                 topK: 40
             }
@@ -104,7 +108,8 @@ const analizarGondola = async (imageUrl) => {
         const responseImage = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Data = Buffer.from(responseImage.data).toString('base64');
 
-        const systemPrompt = `Analiza la imagen de esta góndola. Extrae productos en JSON:
+        // Corregido el prompt para asegurar consistencia
+        const systemPrompt = `Analiza la imagen de esta góndola de supermercado. Extrae productos en formato JSON estricto:
         [{"nombre": "Nombre", "marca": "Marca", "ean": "EAN", "categoria": "Categoría"}]`;
 
         const payload = {
