@@ -16,7 +16,8 @@ function App() {
     logo: "https://via.placeholder.com/80"
   });
 
-  const API_URL = window.location.hostname === 'localhost' 
+  // Definimos la base limpia del servidor
+  const SERVER_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
     : window.location.origin;
 
@@ -39,7 +40,7 @@ function App() {
     const email = localStorage.getItem('userEmail');
     if (!tokenAct) return;
     try {
-      const res = await fetch(`${API_URL}/api/productos`, {
+      const res = await fetch(`${SERVER_URL}/api/productos`, {
         headers: {
           'Authorization': `Bearer ${tokenAct}`,
           'x-user-email': email,
@@ -59,7 +60,7 @@ function App() {
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       setCargando(true);
-      const res = await fetch(`${API_URL}/api/auth/google`, {
+      const res = await fetch(`${SERVER_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken: credentialResponse.credential })
@@ -81,7 +82,7 @@ function App() {
     if (carrito.length === 0) return;
     try {
       setCargando(true);
-      const res = await fetch(`${API_URL}/api/pagos/crear-preferencia`, {
+      const res = await fetch(`${SERVER_URL}/api/pagos/crear-preferencia`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +131,7 @@ function App() {
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
           
           <div style={{ marginTop: '20px', borderTop: '1px solid #334155', paddingTop: '10px' }}>
-            <button className="nav-btn" style={{ color: '#22c55e' }} onClick={() => window.open(`${API_URL}/qr`, '_blank')}>
+            <button className="nav-btn" style={{ color: '#22c55e' }} onClick={() => window.open(`${SERVER_URL}/qr`, '_blank')}>
               🟢 Conectar Bot
             </button>
           </div>
@@ -173,7 +174,13 @@ function App() {
         </header>
         <div style={{ padding: '1.5rem' }}>
           {view === 'inventario_pro' ? (
-            <Inventario token={token} API_URL={`${API_URL}/api`} refreshList={obtenerProductos} carrito={carrito} setCarrito={setCarrito} />
+            <Inventario 
+                token={token} 
+                API_URL={`${SERVER_URL}/api/productos`} 
+                refreshList={obtenerProductos} 
+                carrito={carrito} 
+                setCarrito={setCarrito} 
+            />
           ) : (
             <div style={{ textAlign: 'center', marginTop: '50px' }}><h3>Módulo de {view} en desarrollo</h3></div>
           )}

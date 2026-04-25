@@ -5,7 +5,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     const [productos, setProductos] = useState([]);
     const [loteDetectado, setLoteDetectado] = useState(null); 
     const [loading, setLoading] = useState(false);
-    const [subiendoImg, setSubiendoImg] = useState(false); // Nuevo: estado para la subida tradicional
+    const [subiendoImg, setSubiendoImg] = useState(false); 
     const [busqueda, setBusqueda] = useState("");
     const [fotoExpandida, setFotoExpandida] = useState(null);
     const [orden, setOrden] = useState("recientes");
@@ -19,7 +19,8 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
 
     const fetchProductos = async () => {
         try {
-            const res = await axios.get(`${API_URL}/productos`, {
+            // API_URL ya viene como ".../api/productos"
+            const res = await axios.get(`${API_URL}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.data && res.data.productos) {
@@ -28,7 +29,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         } catch (err) { console.error("Error cargando DB:", err); }
     };
 
-    // Subida tradicional a Cloudinary
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -38,8 +38,7 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
 
         try {
             setSubiendoImg(true);
-            // Usamos el endpoint de subida que configuramos en el backend
-            const res = await axios.post(`${API_URL}/productos/upload-image`, formData, {
+            const res = await axios.post(`${API_URL}/upload-image`, formData, {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
@@ -54,6 +53,18 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
             alert("No se pudo subir la imagen a la nube.");
         } finally {
             setSubiendoImg(false);
+        }
+    };
+
+    const eliminarProducto = async (id, nombre) => {
+        if (!window.confirm(`¿Estás seguro de eliminar ${nombre}?`)) return;
+        try {
+            await axios.delete(`${API_URL}/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            fetchProductos();
+        } catch (err) {
+            alert("Error al eliminar el producto");
         }
     };
 
@@ -87,11 +98,11 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         e.preventDefault();
         try {
             if (editandoProd.id) {
-                await axios.put(`${API_URL}/productos/${editandoProd.id}`, editandoProd, {
+                await axios.put(`${API_URL}/${editandoProd.id}`, editandoProd, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
             } else {
-                await axios.post(`${API_URL}/productos`, editandoProd, {
+                await axios.post(`${API_URL}`, editandoProd, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
             }
@@ -115,10 +126,11 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
         formData.append('imagen', file);
         setLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/productos/detectar-lote`, formData, {
+            const res = await axios.post(`${API_URL}/detectar-lote`, formData, {
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
             });
             setLoteDetectado(res.data);
+            fetchProductos(); // Refrescar tras detección IA
         } catch (err) { alert("Error en detección"); }
         finally { setLoading(false); e.target.value = null; }
     };
@@ -126,7 +138,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
     return (
         <div className="inventory-pro" style={{ padding: '20px' }}>
             
-            {/* MODAL DE EDICIÓN ACTUALIZADO */}
             {modalAbierto && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <form onSubmit={guardarProductoCompleto} style={{ background: 'white', padding: '30px', borderRadius: '15px', width: '420px' }}>
@@ -146,7 +157,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                             </div>
                         </div>
 
-                        {/* SECCIÓN DE SUBIDA TRADICIONAL */}
                         <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px dashed #cbd5e1', marginBottom: '20px' }}>
                             <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '10px' }}>IMAGEN (TRADICIONAL)</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -174,7 +184,6 @@ const Inventario = ({ token, API_URL, refreshList, carrito, setCarrito }) => {
                 </div>
             )}
 
-            {/* Galería expandida */}
             {fotoExpandida && (
                 <div onClick={() => setFotoExpandida(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
                     <img src={fotoExpandida} style={{ maxHeight: '90vh', maxWidth: '90vw', borderRadius: '12px' }} alt="zoom" />
