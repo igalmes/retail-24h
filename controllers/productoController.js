@@ -85,13 +85,15 @@ exports.detectarYGuardar = async (req, res) => {
  */
 exports.obtenerTodos = async (req, res) => {
     try {
+        console.log("Buscando productos para comercio:", req.user.comercioId);
         const productos = await Producto.findAll({ 
             where: { comercioId: req.user.comercioId },
-            order: [['updatedAt', 'DESC']]
+            // Si no estás seguro de si existe 'updatedAt', ordena por 'id'
+            order: [['id', 'DESC']] 
         });
 
-        // Calculamos alertas de faltantes en el momento
-        const faltantes = productos.filter(p => p.stock_actual <= p.stock_minimo);
+        // Usamos stock_minimo que es la que tienen los Pan Lactal del comercio 1
+        const faltantes = productos.filter(p => p.stock_actual <= (p.stock_minimo || 5));
 
         res.json({
             count: productos.length,
@@ -99,10 +101,10 @@ exports.obtenerTodos = async (req, res) => {
             productos
         });
     } catch (error) {
-        res.status(500).json({ error: "Error al recuperar inventario" });
+        console.error("DETALLE ERROR SQL:", error); // Esto te dirá exactamente qué columna falta
+        res.status(500).json({ error: "Error al recuperar inventario", detail: error.message });
     }
 };
-
 /**
  * ACTUALIZAR (Incluye precio_compra y stock_minimo)
  */
