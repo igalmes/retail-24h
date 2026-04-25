@@ -32,7 +32,6 @@ const initialize = async (userId = 1) => {
             qrcodeTerminal.generate(qr, { small: true });
             qrImpreso = true; 
         }
-        
         try { 
             global.ultimoQR = await QRCodeImage.toDataURL(qr); 
         } catch (e) {
@@ -46,13 +45,7 @@ const initialize = async (userId = 1) => {
         global.ultimoQR = null; 
     });
 
-    client.on('authenticated', () => {
-        console.log("✅ [BOT]: Autenticado correctamente.");
-        qrImpreso = true; 
-    });
-
     client.on('message_create', async (msg) => {
-        // Filtro inicial
         if (!msg.from.endsWith('@c.us') || !msg.body.toLowerCase().startsWith('bot')) return;
 
         try {
@@ -67,85 +60,74 @@ const initialize = async (userId = 1) => {
             const { id: dbUsuarioId, rol, nombre, comercioId } = user;
             const consulta = msg.body.replace(/^bot\s*/i, "").trim();
 
-            console.log(`[WA-PROC]: Usuario: ${nombre} | Consulta: "${consulta}"`);
+            console.log(`\n[WA-PROC]: 👤 ${nombre} | 💬 "${consulta}"`);
 
-            // 🔍 BÚSQUEDA FILTRADA (Para no saturar el contexto de Gemini)
-            // Extraemos palabras clave de la consulta para buscar coincidencias en la DB
+            // BÚSQUEDA FILTRADA
             const terminos = consulta.split(' ').filter(t => t.length > 2);
-            
             const inventarioRelevante = await Producto.findAll({
-    where: { 
-        [Op.and]: [
-            // Filtro ampliado: Tu comercio (1), SEPA (2) o Global (0)
-            { comercioId: { [Op.in]: [comercioId, 0, 2, 3] } }, 
-            
-            {
-                [Op.or]: [
-                    { nombre: { [Op.like]: `%${terminos[0] || ''}%` } },
-                    { marca: { [Op.like]: `%${terminos[0] || ''}%` } }
-                ]
-            }
-        ]
-    },
-    // ... resto del código igual
-    attributes: [
-        'nombre', 
-        'marca', 
-        'categoria', 
-        'precio_actualizado', 
-        'stock_actual', 
-        'precio_sugerido', // <--- Clave para el SEPA
-        'comercioId'       // Para que Gemini sepa cuál es local y cuál global
-    ], 
-    limit: 25, 
-    raw: true
-});
+                where: { 
+                    [Op.and]: [
+                        { comercioId: { [Op.in]: [comercioId, 0, 2, 3] } }, 
+                        {
+                            [Op.or]: [
+                                { nombre: { [Op.like]: `%${terminos.join('%')}%` } },
+                                { marca: { [Op.like]: `%${terminos[0] || ''}%` } }
+                            ]
+                        }
+                    ]
+                },
+                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'precio_sugerido', 'comercioId', 'imagen_url'], 
+                limit: 30, 
+                raw: true
+            });
 
-            // Llamada a Gemini con el inventario filtrado
             const resIA = await geminiService.procesarChatBot(consulta, rol, inventarioRelevante, nombre, comercioId);
 
-            console.log(`[WA-IA]: Accion sugerida: ${resIA.accion}`);
-
-            // Lógica de DB (Admin/Socio)
+            // LOGICA DE BASE DE DATOS CON LOGS SEGUROS
             if ((rol === 'admin' || rol === 'socio') && resIA.accion !== 'ninguna') {
                 try {
+                    console.log(`[WA-DB]: Iniciando acción "${resIA.accion}" para el comercio ${comercioId}...`);
+
                     if (resIA.accion === 'crear') {
-                        await Producto.create({
+                        const nuevoProd = await Producto.create({
                             nombre: resIA.payload.nombre,
                             marca: resIA.payload.marca || 'S/M',
                             categoria: resIA.payload.categoria || 'General',
                             precio_actualizado: resIA.payload.precio || 0,
+                            precio_sugerido: resIA.payload.precio || 0,
                             stock_actual: resIA.payload.cantidad || 0,
                             comercioId: comercioId,
-                            UsuarioId: dbUsuarioId 
+                            UsuarioId: dbUsuarioId,
+                            proveedor: 'BOT' // Evita errores si la columna es obligatoria
                         });
+                        console.log(`✅ [WA-DB]: Producto creado con ID: ${nuevoProd.id}`);
                     } 
                     else if (resIA.accion === 'eliminar') {
-                        await Producto.destroy({ 
+                        const filas = await Producto.destroy({ 
                             where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
                         });
+                        console.log(`🗑️ [WA-DB]: Se eliminaron ${filas} registros.`);
                     }
                     else if (resIA.accion === 'actualizar') {
-                        const updateData = {
+                        const [actualizados] = await Producto.update({
                             precio_actualizado: resIA.payload.precio,
-                            stock_actual: resIA.payload.cantidad
-                        };
-                        if (resIA.payload.marca) updateData.marca = resIA.payload.marca;
-                        if (resIA.payload.categoria) updateData.categoria = resIA.payload.categoria;
-
-                        await Producto.update(updateData, { 
+                            stock_actual: resIA.payload.cantidad,
+                            marca: resIA.payload.marca,
+                            categoria: resIA.payload.categoria
+                        }, { 
                             where: { nombre: resIA.payload.nombre, comercioId: comercioId } 
                         });
+                        console.log(`🔄 [WA-DB]: Se actualizaron ${actualizados} registros.`);
                     }
                 } catch (dbErr) {
-                    console.error("[WA-DB-ERROR]:", dbErr.message);
+                    console.error("❌ [WA-DB-ERROR]: Detalle técnico del error:");
+                    console.error(dbErr.parent || dbErr.message); 
                 }
             }
             
             const encabezado = `👤 *Usuario:* ${nombre}\n🛡️ *Rol:* ${rol.toUpperCase()}\n🏛️ *Comercio:* ${comercioId}\n\n`;
             const mensajeFinal = encabezado + resIA.mensaje;
 
-            // Enviar con imagen si Gemini identificó un producto específico
             if (resIA.payload && resIA.payload.nombre) {
                 const prodConImagen = inventarioRelevante.find(p => 
                     p.nombre.toLowerCase().includes(resIA.payload.nombre.toLowerCase()) && p.imagen_url
@@ -157,7 +139,7 @@ const initialize = async (userId = 1) => {
                         await client.sendMessage(msg.from, media, { caption: mensajeFinal });
                         return; 
                     } catch (imgErr) {
-                        console.error("[WA-IMG-ERROR]:", imgErr.message);
+                        console.error("[WA-IMG-ERROR]: No se pudo cargar la imagen de Cloudinary.");
                     }
                 }
             }
