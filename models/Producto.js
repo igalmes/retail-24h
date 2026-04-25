@@ -13,7 +13,7 @@ const Producto = sequelize.define('Producto', {
     codigo_barras: { type: DataTypes.STRING },
     ultima_sincronizacion_api: { type: DataTypes.DATE },
     precio_compra: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
-    stock_minimo_alerta: { type: DataTypes.INTEGER, defaultValue: 5 },
+    stock_minimo: { type: DataTypes.INTEGER, defaultValue: 5 },
     proveedor: { type: DataTypes.STRING, defaultValue: 'Sin Proveedor' },
     comercioId: {
         type: DataTypes.INTEGER,

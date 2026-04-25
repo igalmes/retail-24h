@@ -91,7 +91,7 @@ exports.obtenerTodos = async (req, res) => {
         });
 
         // Calculamos alertas de faltantes en el momento
-        const faltantes = productos.filter(p => p.stock_actual <= p.stock_minimo_alerta);
+        const faltantes = productos.filter(p => p.stock_actual <= p.stock_minimo);
 
         res.json({
             count: productos.length,
@@ -104,7 +104,7 @@ exports.obtenerTodos = async (req, res) => {
 };
 
 /**
- * ACTUALIZAR (Incluye precio_compra y stock_minimo_alerta)
+ * ACTUALIZAR (Incluye precio_compra y stock_minimo)
  */
 exports.actualizar = async (req, res) => {
     try {
@@ -114,7 +114,7 @@ exports.actualizar = async (req, res) => {
             precio_compra, 
             nombre, 
             stock_actual, 
-            stock_minimo_alerta,
+            stock_minimo,
             proveedor 
         } = req.body;
 
@@ -124,7 +124,7 @@ exports.actualizar = async (req, res) => {
                 precio_compra, 
                 nombre, 
                 stock_actual, 
-                stock_minimo_alerta,
+                stock_minimo,
                 proveedor 
             }, 
             { where: { id, comercioId: req.user.comercioId } }
@@ -201,7 +201,7 @@ exports.ajustarStock = async (req, res) => {
         res.json({ 
             mensaje: "Stock actualizado", 
             nuevo_stock: producto.stock_actual,
-            alerta: producto.stock_actual <= producto.stock_minimo_alerta 
+            alerta: producto.stock_actual <= producto.stock_minimo 
         });
     } catch (error) {
         res.status(500).json({ error: "Error al ajustar stock" });
