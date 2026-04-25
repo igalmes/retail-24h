@@ -19,7 +19,7 @@ const Producto = sequelize.define('Producto', {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'comercios', // Nombre de la tabla en MySQL
+            model: 'comercios',
             key: 'id'
         }
     },
@@ -27,13 +27,15 @@ const Producto = sequelize.define('Producto', {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-            model: 'usuarios', // Nombre de la tabla en MySQL
+            model: 'usuarios',
             key: 'id'
         }
     }
 }, {
-    tableName: 'productos', 
-    timestamps: true        
+    tableName: 'productos',     // Forzamos el nombre exacto de la tabla
+    freezeTableName: true,      // EVITA que Sequelize invente nombres como "Productos"
+    timestamps: false,           // Tu tabla de Workbench no tiene las columnas de fecha, así que lo apagamos
+    underscored: false
 });
 
 module.exports = Producto;

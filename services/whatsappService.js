@@ -74,17 +74,32 @@ const initialize = async (userId = 1) => {
             const terminos = consulta.split(' ').filter(t => t.length > 2);
             
             const inventarioRelevante = await Producto.findAll({
-                where: { 
-                    comercioId: comercioId,
-                    [Op.or]: [
-                        { nombre: { [Op.like]: `%${terminos[0] || ''}%` } },
-                        { marca: { [Op.like]: `%${terminos[0] || ''}%` } }
-                    ]
-                },
-                attributes: ['nombre', 'marca', 'categoria', 'precio_actualizado', 'stock_actual', 'imagen_url', 'precio_sugerido', 'codigo_barras'], 
-                limit: 20, // Enviamos solo los 20 más relevantes
-                raw: true
-            });
+    where: { 
+        [Op.and]: [
+            // Filtro 1: O es del comercio del usuario, o es un dato global (id 0)
+            { comercioId: { [Op.in]: [comercioId, 0] } }, 
+            
+            // Filtro 2: Coincidencia de nombre o marca
+            {
+                [Op.or]: [
+                    { nombre: { [Op.like]: `%${terminos[0] || ''}%` } },
+                    { marca: { [Op.like]: `%${terminos[0] || ''}%` } }
+                ]
+            }
+        ]
+    },
+    attributes: [
+        'nombre', 
+        'marca', 
+        'categoria', 
+        'precio_actualizado', 
+        'stock_actual', 
+        'precio_sugerido', // <--- Clave para el SEPA
+        'comercioId'       // Para que Gemini sepa cuál es local y cuál global
+    ], 
+    limit: 25, 
+    raw: true
+});
 
             // Llamada a Gemini con el inventario filtrado
             const resIA = await geminiService.procesarChatBot(consulta, rol, inventarioRelevante, nombre, comercioId);

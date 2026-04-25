@@ -10,3 +10,4 @@ npm-debug.log*
 .wwebjs_cache/
 test.jpg
 test-models.js
+scripts
