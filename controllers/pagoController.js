@@ -9,8 +9,21 @@ exports.crearPreferencia = async (req, res) => {
         if (!items || items.length === 0) return res.status(400).json({ error: "Carrito vacío" });
 
         // 1. Buscamos el comercio del usuario logueado para obtener su Access Token
-        const comercioId = req.user.comercioId; 
+        const comercioId = req.user.comercioId;
+        
+        // --- BLOQUE DE DEBUG ---
+        console.log("DEBUG: Intentando crear preferencia...");
+        console.log("DEBUG: comercioId extraído del Token:", comercioId);
+        
         const comercioDB = await Comercio.findByPk(comercioId);
+        
+        if (!comercioDB) {
+            console.error("DEBUG: Error - No se encontró ningún comercio con ID:", comercioId);
+        } else {
+            console.log("DEBUG: Comercio encontrado:", comercioDB.nombre);
+            console.log("DEBUG: ¿Tiene token MP?:", comercioDB.mp_access_token ? "SÍ (empieza con " + comercioDB.mp_access_token.substring(0, 10) + "...)" : "NO");
+        }
+        // -----------------------
 
         if (!comercioDB || !comercioDB.mp_access_token) {
             throw new Error("El comercio no tiene configuradas credenciales de Mercado Pago.");
@@ -106,8 +119,6 @@ exports.recibirWebhook = async (req, res) => {
                 if (pedido && pedido.estado_pago !== 'approved') {
                     await Pedido.update({ estado_pago: 'approved' }, { where: { id: pedidoId } });
                     console.log(`✅ Pago confirmado para Pedido #${pedidoId} (Comercio: ${comercioId})`);
-                    
-                    // AQUÍ PODRÁS DISPARAR EL MENSAJE DE WHATSAPP MÁS ADELANTE
                 }
             }
         }

@@ -25,7 +25,7 @@ const Comercio = sequelize.define('Comercio', {
     allowNull: true
   }
 }, {
-  tableName: 'Comercios',
+  tableName: 'comercios',
   timestamps: true
 });
 

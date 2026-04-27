@@ -31,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/productos', verifyToken, require('./routes/productoRoutes'));
 app.use('/api/pagos', verifyToken, pagoRoutes); 
 app.use('/api/config', verifyToken, configRoutes);
+app.use('/api/comercios', comercioRoutes)
 
 app.get('/qr', (req, res) => {
     if (global.ultimoQR) {
