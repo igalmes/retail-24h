@@ -8,9 +8,10 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [carrito, setCarrito] = useState([]); 
-  const [view, setView] = useState('inventario_pro');
+  const [view, setView] = useState('inventario_pro'); // Corregido: solo una declaración
   const [cargando, setCargando] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [nuevoTokenMP, setNuevoTokenMP] = useState('');
   const [configComercio, setConfigComercio] = useState({
     nombre: "Retail 24h AI",
     logo: "https://via.placeholder.com/80"
@@ -103,6 +104,33 @@ function App() {
     finally { setCargando(false); }
   };
 
+  // Función para guardar credenciales de Mercado Pago
+  const guardarCredencialesMP = async () => {
+    if (!nuevoTokenMP) return alert("Por favor, ingresa un token válido.");
+    try {
+      setCargando(true);
+      const res = await fetch(`${SERVER_URL}/api/comercios/mis-credenciales`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ mp_access_token: nuevoTokenMP })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("¡Token guardado exitosamente!");
+        setNuevoTokenMP('');
+      } else {
+        alert(data.error || "Error al guardar credenciales");
+      }
+    } catch (err) {
+      alert("Error de conexión con el servidor");
+    } finally {
+      setCargando(false);
+    }
+  };
+
   if (!token) {
     return (
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -129,6 +157,12 @@ function App() {
         <nav className="sidebar-nav">
           <button className={`nav-btn ${view === 'inventario_pro' ? 'active' : ''}`} onClick={() => { setView('inventario_pro'); setMenuAbierto(false); }}>🚀 Inventario</button>
           <button className={`nav-btn ${view === 'clientes' ? 'active' : ''}`} onClick={() => { setView('clientes'); setMenuAbierto(false); }}>👥 Clientes</button>
+          <button 
+              className={`nav-btn ${view === 'configuracion' ? 'active' : ''}`} 
+              onClick={() => { setView('configuracion'); setMenuAbierto(false); }}
+          >
+              ⚙️ Configuración
+          </button>
           
           <div style={{ marginTop: '20px', borderTop: '1px solid #334155', paddingTop: '10px' }}>
             <button className="nav-btn" style={{ color: '#22c55e' }} onClick={() => window.open(`${SERVER_URL}/qr`, '_blank')}>
@@ -181,6 +215,28 @@ function App() {
                 carrito={carrito} 
                 setCarrito={setCarrito} 
             />
+          ) : view === 'configuracion' ? (
+            <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                <h2 style={{ marginBottom: '10px' }}>Configuración de Pagos</h2>
+                <p style={{ color: '#64748b', marginBottom: '20px' }}>Ingresa tu <b>Access Token</b> de Mercado Pago para procesar ventas en tu cuenta.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <input 
+                        type="password" 
+                        placeholder="APP_USR-..." 
+                        value={nuevoTokenMP}
+                        onChange={(e) => setNuevoTokenMP(e.target.value)}
+                        style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }}
+                    />
+                    <button 
+                        onClick={guardarCredencialesMP}
+                        className="btn-pay" 
+                        style={{ width: 'fit-content', background: '#22c55e', padding: '10px 25px' }}
+                        disabled={cargando}
+                    >
+                        {cargando ? 'GUARDANDO...' : 'ACTUALIZAR TOKEN'}
+                    </button>
+                </div>
+            </div>
           ) : (
             <div style={{ textAlign: 'center', marginTop: '50px' }}><h3>Módulo de {view} en desarrollo</h3></div>
           )}
