@@ -35,8 +35,7 @@ exports.crearPreferencia = async (req, res) => {
         const totalPedido = itemsVerificados.reduce((acc, i) => acc + (i.unit_price * i.quantity), 0);
 
         // Registro del pedido
-        const nuevoPedido = await Pedido.create({
-	    console.log("DEBUG - Usuario ID del token:", req.user ? req.user.id : "No hay usuario"); 
+        const nuevoPedido = await Pedido.create({ 
             total: totalPedido, 
             estado_pago: 'pendiente',
             UsuarioId: req.user.id 
