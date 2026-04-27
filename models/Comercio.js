@@ -18,6 +18,11 @@ const Comercio = sequelize.define('Comercio', {
   estado: {
     type: DataTypes.ENUM('activo', 'suspendido'),
     defaultValue: 'activo'
+  },
+  // Nuevo campo para el esquema Multi-tenant
+  mp_access_token: {
+    type: DataTypes.STRING(255),
+    allowNull: true
   }
 }, {
   tableName: 'Comercios',
