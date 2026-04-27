@@ -8,10 +8,9 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [carrito, setCarrito] = useState([]); 
-  const [view, setView] = useState('inventario_pro'); // Corregido: solo una declaración
+  const [view, setView] = useState('inventario_pro');
   const [cargando, setCargando] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const [nuevoTokenMP, setNuevoTokenMP] = useState('');
   const [configComercio, setConfigComercio] = useState({
     nombre: "Retail 24h AI",
     logo: "https://via.placeholder.com/80"
@@ -104,25 +103,19 @@ function App() {
     finally { setCargando(false); }
   };
 
-  // Función para guardar credenciales de Mercado Pago
-  const guardarCredencialesMP = async () => {
-    if (!nuevoTokenMP) return alert("Por favor, ingresa un token válido.");
+  // NUEVA FUNCIÓN: Iniciar flujo OAuth de Mercado Pago
+  const vincularMercadoPago = async () => {
     try {
       setCargando(true);
-      const res = await fetch(`${SERVER_URL}/api/comercios/mis-credenciales`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ mp_access_token: nuevoTokenMP })
+      const res = await fetch(`${SERVER_URL}/api/comercios/vincular-mp`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok) {
-        alert("¡Token guardado exitosamente!");
-        setNuevoTokenMP('');
+      if (data.url) {
+        // Abrimos el login de MP en una pestaña nueva
+        window.open(data.url, '_blank', 'width=600,height=700');
       } else {
-        alert(data.error || "Error al guardar credenciales");
+        alert("No se pudo obtener la URL de vinculación");
       }
     } catch (err) {
       alert("Error de conexión con el servidor");
@@ -218,23 +211,28 @@ function App() {
           ) : view === 'configuracion' ? (
             <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
                 <h2 style={{ marginBottom: '10px' }}>Configuración de Pagos</h2>
-                <p style={{ color: '#64748b', marginBottom: '20px' }}>Ingresa tu <b>Access Token</b> de Mercado Pago para procesar ventas en tu cuenta.</p>
+                <p style={{ color: '#64748b', marginBottom: '20px' }}>Conecta tu cuenta de <b>Mercado Pago</b> para procesar ventas de forma segura.</p>
+                
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <input 
-                        type="password" 
-                        placeholder="APP_USR-..." 
-                        value={nuevoTokenMP}
-                        onChange={(e) => setNuevoTokenMP(e.target.value)}
-                        style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }}
-                    />
                     <button 
-                        onClick={guardarCredencialesMP}
+                        onClick={vincularMercadoPago}
                         className="btn-pay" 
-                        style={{ width: 'fit-content', background: '#22c55e', padding: '10px 25px' }}
+                        style={{ 
+                          width: 'fit-content', 
+                          background: '#009ee3', 
+                          padding: '12px 25px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}
                         disabled={cargando}
                     >
-                        {cargando ? 'GUARDANDO...' : 'ACTUALIZAR TOKEN'}
+                        <img src="https://http2.mlstatic.com/frontend-assets/frontend-ms-user-navigation/release/1.76.2/mercadopago/favicon.64x64.png" width="20" alt="MP" />
+                        {cargando ? 'REDIRECCIONANDO...' : 'VINCULAR MERCADO PAGO'}
                     </button>
+                    <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      * Serás redirigido al sitio oficial de Mercado Pago para autorizar la conexión.
+                    </p>
                 </div>
             </div>
           ) : (
