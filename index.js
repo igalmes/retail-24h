@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const verifyToken = require('./middleware/auth');
 const pagoRoutes = require('./routes/pagoRoutes');
 const configRoutes = require('./routes/configRoutes');
+const comercioRoutes = require('./routes/comercioRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
